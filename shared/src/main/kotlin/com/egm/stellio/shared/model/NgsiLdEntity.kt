@@ -254,9 +254,8 @@ class NgsiLdGeoPropertyInstance(
             val datasetId = values.getDatasetId()
 
             val geoPropertyValue = expandValueAsMap(values[NGSILD_GEOPROPERTY_VALUE]!!)
-            val geoPropertyType = GeoPropertyType.valueOf(
-                (geoPropertyValue["@type"]!![0] as String).extractShortTypeFromExpanded()
-            )
+            val expandedGeoPropertyType = geoPropertyValue[JSONLD_TYPE]!![0] as String
+            val geoPropertyType = GeoPropertyType.valueOf(expandedGeoPropertyType.extractShortTypeFromExpanded())
             val coordinates = extractCoordinates(geoPropertyType, geoPropertyValue)
 
             val attributes = getNonCoreAttributes(values, NGSILD_GEOPROPERTIES_CORE_MEMEBERS)
@@ -276,12 +275,21 @@ class NgsiLdGeoPropertyInstance(
         }
 
         // TODO this lacks sanity checks
-        private fun extractCoordinates(geoPropertyType: GeoPropertyType, geoPropertyValue: Map<String, List<Any>>):
-            List<Any> {
-            val coordinates = geoPropertyValue[NGSILD_COORDINATES_PROPERTY]!!
+        private fun extractCoordinates(
+            geoPropertyType: GeoPropertyType,
+            geoPropertyValue: Map<String, List<Any>>
+        ): List<Any> {
+            val coordinates =
+                if (geoPropertyValue.containsKey(NGSILD_COORDINATES_PROPERTY))
+                    geoPropertyValue[NGSILD_COORDINATES_PROPERTY]!!
+                else
+                    throw BadRequestDataException(
+                        "Geoproperty of type $geoPropertyType does not contain coordinates"
+                    )
             if (geoPropertyType == GeoPropertyType.Point) {
-                val longitude = (coordinates[0] as Map<String, Double>)["@value"]!!
-                val latitude = (coordinates[1] as Map<String, Double>)["@value"]!!
+                val innerCoordinates = (coordinates[0] as Map<String, List<Map<String, Double>>>)["@list"]!!
+                val longitude = innerCoordinates[0]["@value"]!!
+                val latitude = innerCoordinates[1]["@value"]!!
                 return listOf(longitude, latitude)
             } else {
                 val res = arrayListOf<List<Double?>>()
