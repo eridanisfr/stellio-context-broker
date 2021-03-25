@@ -1,7 +1,7 @@
 {
     "entityId":"urn:ngsi-ld:Vehicle:A4567",
     "contexts":[
-      "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld"
+      "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context-v1.3.jsonld"
     ],
     "operationType":"ENTITY_DELETE"
 }

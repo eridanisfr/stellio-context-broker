@@ -5,7 +5,7 @@
    "operationPayload":"{ \"value\":76, \"unitCode\": \"CEL\", \"observedAt\": \"2019-10-26T22:35:52.98601Z\" }",
    "updatedEntity":"",
    "contexts":[
-      "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld"
+      "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context-v1.3.jsonld"
    ],
    "operationType":"ATTRIBUTE_UPDATE"
 }

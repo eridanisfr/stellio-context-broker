@@ -64,7 +64,7 @@ class JsonLdUtilsTests {
                 "http://example.org/ngsi-ld/latest/commonTerms.jsonld",
                 "http://example.org/ngsi-ld/latest/vehicle.jsonld",
                 "http://example.org/ngsi-ld/latest/parking.jsonld",
-                "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld"
+                "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context-v1.3.jsonld"
             ]
         }
         """.trimIndent()
@@ -87,7 +87,7 @@ class JsonLdUtilsTests {
                 "http://example.org/ngsi-ld/latest/commonTerms.jsonld",
                 "http://example.org/ngsi-ld/latest/vehicle.jsonld",
                 "http://example.org/ngsi-ld/latest/parking.jsonld",
-                "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld"
+                "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context-v1.3.jsonld"
             ]
         }
         """.trimIndent()
@@ -170,7 +170,7 @@ class JsonLdUtilsTests {
             """
             {
                 "@context": [
-                    "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld"
+                    "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context-v1.3.jsonld"
                 ]
             }
             """.trimIndent()
@@ -286,7 +286,7 @@ class JsonLdUtilsTests {
                 "type":"Device",
                 "@context":[
                     "https://fiware.github.io/data-models/context.jsonld",
-                    "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld"
+                    "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context-v1.3.jsonld"
                 ]
             }
             """.trimIndent()

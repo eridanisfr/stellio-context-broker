@@ -112,7 +112,7 @@ class ApiUtilsTests {
                     "type": "Building",
                     "@context": [
                         "https://fiware.github.io/data-models/context.jsonld",
-                        "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld"
+                        "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context-v1.3.jsonld"
                     ]
                 }
             """
@@ -123,7 +123,7 @@ class ApiUtilsTests {
             contexts.containsAll(
                 listOf(
                     "https://fiware.github.io/data-models/context.jsonld",
-                    "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld"
+                    "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context-v1.3.jsonld"
                 )
             )
         )
