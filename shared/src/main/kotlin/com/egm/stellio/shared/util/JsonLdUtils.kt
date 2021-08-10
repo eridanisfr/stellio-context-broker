@@ -19,20 +19,18 @@ import com.github.jsonldjava.core.JsonLdError
 import com.github.jsonldjava.core.JsonLdOptions
 import com.github.jsonldjava.core.JsonLdProcessor
 import com.github.jsonldjava.utils.JsonUtils
+import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.core.io.ClassPathResource
 import org.springframework.http.MediaType
-import org.springframework.stereotype.Component
 import java.net.URI
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZonedDateTime
-import javax.annotation.PostConstruct
 import kotlin.reflect.full.safeCast
 
 data class AttributeType(val uri: String)
 
-@Component
 object JsonLdUtils {
 
     const val NGSILD_CORE_CONTEXT = "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context-v1.3.jsonld"
@@ -74,7 +72,7 @@ object JsonLdUtils {
     const val EGM_RAISED_NOTIFICATION = "https://ontology.eglobalmark.com/egm#raised"
     const val EGM_SPECIFIC_ACCESS_POLICY = "https://ontology.eglobalmark.com/egm#specificAccessPolicy"
 
-    val logger = LoggerFactory.getLogger(javaClass)
+    val logger: Logger = LoggerFactory.getLogger(javaClass)
 
     private val mapper: ObjectMapper =
         jacksonObjectMapper()
@@ -86,8 +84,7 @@ object JsonLdUtils {
         ClassPathResource("/contexts/ngsi-ld-core-context-v1.3.jsonld").inputStream.readBytes().toString(Charsets.UTF_8)
     private var BASE_CONTEXT: Map<String, Any> = mapOf()
 
-    @PostConstruct
-    private fun loadCoreContext() {
+    init {
         val coreContext: Map<String, Any> = deserializeObject(localCoreContextPayload)
         BASE_CONTEXT = coreContext[JSONLD_CONTEXT] as Map<String, Any>
         logger.info("Core context loaded")
@@ -276,9 +273,9 @@ object JsonLdUtils {
     }
 
     fun expandJsonLdFragment(fragment: String, contexts: List<String>): Map<String, Any> {
-        val usedContext = addCoreContext(contexts)
-        val jsonLdOptions = JsonLdOptions()
-        jsonLdOptions.expandContext = mapOf(JSONLD_CONTEXT to usedContext)
+        val jsonLdOptions = JsonLdOptions().apply {
+            expandContext = mapOf(JSONLD_CONTEXT to addCoreContext(contexts))
+        }
         return parseAndExpandJsonLdFragment(fragment, jsonLdOptions)
     }
 

@@ -86,7 +86,7 @@ class EntityHandlerTests {
             "master/shared-jsonld-contexts/egm.jsonld",
         "https://raw.githubusercontent.com/easy-global-market/ngsild-api-data-models/" +
             "master/aquac/jsonld-contexts/aquac.jsonld",
-        "http://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld"
+        "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context-v1.3.jsonld"
     )
 
     @Test
@@ -827,7 +827,7 @@ class EntityHandlerTests {
         every { entityService.exists(any()) } returns true
         every { entityService.getFullEntityById(any()) } returns JsonLdEntity(
             mapOf(
-                "https://uri.etsi.org/ngsi-ld/name" to
+                "https://uri.etsi.org/ngsi-ld/default-context/name" to
                     mapOf(
                         JSONLD_TYPE to "https://uri.etsi.org/ngsi-ld/Property",
                         NGSILD_PROPERTY_VALUE to "ruche",
@@ -866,7 +866,7 @@ class EntityHandlerTests {
         every { entityService.exists(any()) } returns true
         every { entityService.getFullEntityById(any()) } returns JsonLdEntity(
             mapOf(
-                "https://uri.etsi.org/ngsi-ld/name" to
+                "https://uri.etsi.org/ngsi-ld/default-context/name" to
                     listOf(
                         mapOf(
                             JSONLD_TYPE to "https://uri.etsi.org/ngsi-ld/Property",

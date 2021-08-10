@@ -1,10 +1,12 @@
 package com.egm.stellio.entity.authorization
 
+import com.egm.stellio.shared.util.JsonLdUtils.EGM_BASE_CONTEXT_URL
 import java.net.URI
 
 interface AuthorizationService {
 
     companion object {
+        const val AUTHORIZATION_CONTEXT = "$EGM_BASE_CONTEXT_URL/authorization/jsonld-contexts/authorization.jsonld"
         const val USER_PREFIX: String = "urn:ngsi-ld:User:"
         const val AUTHORIZATION_ONTOLOGY = "https://ontology.eglobalmark.com/authorization#"
         const val USER_LABEL = AUTHORIZATION_ONTOLOGY + "User"

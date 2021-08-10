@@ -1,12 +1,15 @@
 package com.egm.stellio.entity.util
 
+import com.egm.stellio.entity.authorization.AuthorizationService.Companion.AUTHORIZATION_CONTEXT
 import com.egm.stellio.entity.authorization.AuthorizationService.Companion.AUTHORIZATION_ONTOLOGY
 import com.egm.stellio.entity.authorization.AuthorizationService.Companion.CREATION_ROLE_LABEL
+import com.egm.stellio.entity.authorization.AuthorizationService.Companion.EGM_ROLES
+import com.egm.stellio.entity.authorization.AuthorizationService.Companion.USER_LABEL
 import com.egm.stellio.entity.authorization.AuthorizationService.Companion.USER_PREFIX
 import com.egm.stellio.entity.model.Entity
 import com.egm.stellio.entity.model.Property
 import com.egm.stellio.entity.repository.EntityRepository
-import com.egm.stellio.shared.util.JsonLdUtils.EGM_BASE_CONTEXT_URL
+import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_CORE_CONTEXT
 import com.egm.stellio.shared.util.toUri
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.CommandLineRunner
@@ -23,11 +26,7 @@ class ApiTestsBootstrapper(
     val apiTestUserId: String? = null
 
     companion object {
-        val AUTHORIZATION_CONTEXTS: List<String> = listOf(
-            "$EGM_BASE_CONTEXT_URL/authorization/jsonld-contexts/authorization.jsonld",
-            "http://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld"
-        )
-        const val USER_TYPE = "User"
+        val AUTHORIZATION_CONTEXTS: List<String> = listOf(AUTHORIZATION_CONTEXT, NGSILD_CORE_CONTEXT)
         val USER_ROLES = listOf(CREATION_ROLE_LABEL)
     }
 
@@ -38,11 +37,11 @@ class ApiTestsBootstrapper(
         if (apiTestsUser == null) {
             val entity = Entity(
                 id = ngsiLdUserId,
-                type = listOf(AUTHORIZATION_ONTOLOGY + USER_TYPE),
+                type = listOf(USER_LABEL),
                 contexts = AUTHORIZATION_CONTEXTS,
                 properties = mutableListOf(
                     Property(
-                        name = AUTHORIZATION_ONTOLOGY + "roles",
+                        name = EGM_ROLES,
                         value = USER_ROLES
                     ),
                     Property(
