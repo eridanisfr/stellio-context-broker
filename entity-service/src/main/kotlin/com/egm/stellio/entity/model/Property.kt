@@ -12,14 +12,18 @@ import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_DATE_TYPE
 import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_PROPERTY_VALUE
 import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_TIME_TYPE
 import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_UNIT_CODE_PROPERTY
-import com.egm.stellio.shared.util.JsonLdUtils.getPropertyValueFromMap
-import com.egm.stellio.shared.util.JsonLdUtils.getPropertyValueFromMapAsDateTime
-import com.egm.stellio.shared.util.JsonLdUtils.getPropertyValueFromMapAsString
+import com.egm.stellio.shared.util.JsonLdUtils.getPropertyValueFromObject
+import com.egm.stellio.shared.util.JsonLdUtils.getPropertyValueAsDateTime
+import com.egm.stellio.shared.util.JsonLdUtils.getPropertyValueAsString
+import com.egm.stellio.shared.util.JsonLdUtils.toJsonObject
+import com.egm.stellio.shared.util.JsonLdUtils.toJsonString
 import com.egm.stellio.shared.util.JsonUtils.serializeObject
 import com.egm.stellio.shared.util.toNgsiLdFormat
 import com.egm.stellio.shared.util.toUri
 import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.annotation.JsonRawValue
+import jakarta.json.JsonObject
+import jakarta.json.JsonValue
 import org.neo4j.driver.internal.value.StringValue
 import org.springframework.data.annotation.LastModifiedDate
 import org.springframework.data.neo4j.core.convert.ConvertWith
@@ -76,42 +80,42 @@ data class Property(
             datasetId = ngsiLdPropertyInstance.datasetId
         )
 
-    override fun serializeCoreProperties(includeSysAttrs: Boolean): MutableMap<String, Any> {
-        val resultEntity = mutableMapOf<String, Any>()
+    override fun serializeCoreProperties(includeSysAttrs: Boolean): MutableMap<String, JsonValue> {
+        val resultEntity = mutableMapOf<String, JsonValue>()
         if (includeSysAttrs) {
             resultEntity[JsonLdUtils.NGSILD_CREATED_AT_PROPERTY] = mapOf(
                 JSONLD_TYPE to NGSILD_DATE_TIME_TYPE,
                 JSONLD_VALUE_KW to createdAt.toNgsiLdFormat()
-            )
+            ).toJsonObject()
 
             modifiedAt?.run {
                 resultEntity[JsonLdUtils.NGSILD_MODIFIED_AT_PROPERTY] = mapOf(
                     JSONLD_TYPE to NGSILD_DATE_TIME_TYPE,
                     JSONLD_VALUE_KW to this.toNgsiLdFormat()
-                )
+                ).toJsonObject()
             }
         }
         observedAt?.run {
             resultEntity[JsonLdUtils.NGSILD_OBSERVED_AT_PROPERTY] = mapOf(
                 JSONLD_TYPE to NGSILD_DATE_TIME_TYPE,
                 JSONLD_VALUE_KW to this.toNgsiLdFormat()
-            )
+            ).toJsonObject()
         }
 
         datasetId?.run {
             resultEntity[JsonLdUtils.NGSILD_DATASET_ID_PROPERTY] = mapOf(
                 JsonLdUtils.JSONLD_ID to this.toString()
-            )
+            ).toJsonObject()
         }
-        resultEntity[JSONLD_TYPE] = JsonLdUtils.NGSILD_PROPERTY_TYPE.uri
+        resultEntity[JSONLD_TYPE] = JsonLdUtils.NGSILD_PROPERTY_TYPE.uri.toJsonString()
         resultEntity[NGSILD_PROPERTY_VALUE] = when (value) {
-            is ZonedDateTime -> mapOf(JSONLD_TYPE to NGSILD_DATE_TIME_TYPE, JSONLD_VALUE_KW to value)
-            is LocalDate -> mapOf(JSONLD_TYPE to NGSILD_DATE_TYPE, JSONLD_VALUE_KW to value)
-            is LocalTime -> mapOf(JSONLD_TYPE to NGSILD_TIME_TYPE, JSONLD_VALUE_KW to value)
-            else -> value
+            is ZonedDateTime -> mapOf(JSONLD_TYPE to NGSILD_DATE_TIME_TYPE, JSONLD_VALUE_KW to value).toJsonObject()
+            is LocalDate -> mapOf(JSONLD_TYPE to NGSILD_DATE_TYPE, JSONLD_VALUE_KW to value).toJsonObject()
+            is LocalTime -> mapOf(JSONLD_TYPE to NGSILD_TIME_TYPE, JSONLD_VALUE_KW to value).toJsonObject()
+            else -> value.toString().toJsonString()
         }
         unitCode?.run {
-            resultEntity[NGSILD_UNIT_CODE_PROPERTY] = this
+            resultEntity[NGSILD_UNIT_CODE_PROPERTY] = this.toJsonString()
         }
 
         return resultEntity
@@ -167,10 +171,10 @@ data class Property(
         return this
     }
 
-    fun updateValues(updateFragment: Map<String, List<Any>>): Property =
+    fun updateValues(updateFragment: JsonObject): Property =
         updateValues(
-            getPropertyValueFromMapAsString(updateFragment, NGSILD_UNIT_CODE_PROPERTY),
-            getPropertyValueFromMap(updateFragment, NGSILD_PROPERTY_VALUE),
-            getPropertyValueFromMapAsDateTime(updateFragment, JsonLdUtils.NGSILD_OBSERVED_AT_PROPERTY)
+            getPropertyValueAsString(updateFragment, NGSILD_UNIT_CODE_PROPERTY),
+            getPropertyValueFromObject(updateFragment, NGSILD_PROPERTY_VALUE),
+            getPropertyValueAsDateTime(updateFragment, JsonLdUtils.NGSILD_OBSERVED_AT_PROPERTY)
         )
 }

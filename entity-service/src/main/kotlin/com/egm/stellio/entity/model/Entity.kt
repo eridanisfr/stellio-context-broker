@@ -10,10 +10,14 @@ import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_DATE_TIME_TYPE
 import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_GEOPROPERTY_VALUE
 import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_LOCATION_PROPERTY
 import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_MODIFIED_AT_PROPERTY
+import com.egm.stellio.shared.util.JsonLdUtils.toJsonArray
+import com.egm.stellio.shared.util.JsonLdUtils.toJsonObject
+import com.egm.stellio.shared.util.JsonLdUtils.toJsonString
 import com.egm.stellio.shared.util.toNgsiLdFormat
 import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty
+import jakarta.json.JsonValue
 import org.locationtech.jts.io.WKTReader
 import org.springframework.data.annotation.LastModifiedDate
 import org.springframework.data.neo4j.core.convert.ConvertWith
@@ -58,22 +62,22 @@ data class Entity(
 
 ) {
 
-    fun serializeCoreProperties(includeSysAttrs: Boolean): Map<String, Any> {
-        val resultEntity = mutableMapOf<String, Any>()
-        resultEntity[JSONLD_ID] = id.toString()
-        resultEntity[JSONLD_TYPE] = type
+    fun serializeCoreProperties(includeSysAttrs: Boolean): Map<String, JsonValue> {
+        val resultEntity = mutableMapOf<String, JsonValue>()
+        resultEntity[JSONLD_ID] = id.toString().toJsonString()
+        resultEntity[JSONLD_TYPE] = type.toJsonArray()
 
         if (includeSysAttrs) {
             resultEntity[NGSILD_CREATED_AT_PROPERTY] = mapOf(
                 JSONLD_TYPE to NGSILD_DATE_TIME_TYPE,
                 JSONLD_VALUE_KW to createdAt.toNgsiLdFormat()
-            )
+            ).toJsonObject()
 
             modifiedAt?.run {
                 resultEntity[NGSILD_MODIFIED_AT_PROPERTY] = mapOf(
                     JSONLD_TYPE to NGSILD_DATE_TIME_TYPE,
                     JSONLD_VALUE_KW to this.toNgsiLdFormat()
-                )
+                ).toJsonObject()
             }
         }
         location?.run {
@@ -84,7 +88,7 @@ data class Entity(
                     JSONLD_TYPE to geometry.geometryType,
                     NGSILD_COORDINATES_PROPERTY to geometry.coordinates.map { listOf(it.x, it.y) }
                 )
-            )
+            ).toJsonObject()
         }
         return resultEntity
     }

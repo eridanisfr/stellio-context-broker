@@ -1,5 +1,6 @@
 package com.egm.stellio.shared.util
 
+import com.egm.stellio.shared.util.JsonLdUtils.expandJsonLdFragment
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
@@ -17,7 +18,7 @@ class MockkedHandler : customExceptionHandler() {
     @PostMapping("/validate-json-ld-fragment")
     fun validateJsonLdFragment(@RequestBody body: Mono<String>): Mono<ResponseEntity<*>> {
         return body.map {
-            parseAndExpandJsonLdFragment(it)
+            expandJsonLdFragment(it)
         }.map {
             ResponseEntity.status(HttpStatus.CREATED).build<String>()
         }

@@ -19,7 +19,6 @@ import com.egm.stellio.shared.util.JsonUtils
 import com.egm.stellio.shared.util.JsonUtils.deserializeAs
 import com.egm.stellio.shared.util.JsonUtils.serializeObject
 import com.egm.stellio.shared.util.RECEIVED_NON_PARSEABLE_ENTITY
-import com.egm.stellio.shared.util.extractAttributeInstanceFromCompactedEntity
 import com.egm.stellio.shared.util.toUri
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.ObjectNode
@@ -199,8 +198,7 @@ class EntityEventListenerService(
             return
         }
         val compactedJsonLdEntity = addContextsToEntity(JsonUtils.deserializeObject(updatedEntity), contexts)
-        val attributeInstancePayload = extractAttributeInstanceFromCompactedEntity(
-            compactedJsonLdEntity,
+        val attributeInstancePayload = compactedJsonLdEntity.extractAttributeInstance(
             compactTerm(expandedAttributeName, contexts),
             datasetId
         )
@@ -276,8 +274,7 @@ class EntityEventListenerService(
                     observedAt = attributeMetadata.observedAt,
                     measuredValue = attributeMetadata.measuredValue,
                     value = attributeMetadata.value,
-                    payload = extractAttributeInstanceFromCompactedEntity(
-                        compactedJsonLdEntity,
+                    payload = compactedJsonLdEntity.extractAttributeInstance(
                         compactTerm(expandedAttributeName, contexts),
                         attributeMetadata.datasetId
                     )

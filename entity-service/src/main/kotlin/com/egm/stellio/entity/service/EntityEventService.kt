@@ -67,7 +67,7 @@ class EntityEventService(
         appendResult.updated.forEach { updatedDetails ->
             val attributeName = updatedDetails.attributeName
             val attributePayload =
-                JsonLdUtils.getAttributeFromExpandedAttributes(
+                JsonLdUtils.getAttributeFromExpandedFragment(
                     jsonLdAttributes,
                     attributeName,
                     updatedDetails.datasetId
@@ -78,7 +78,7 @@ class EntityEventService(
                         entityId,
                         compactTerm(attributeName, contexts),
                         updatedDetails.datasetId,
-                        JsonLdUtils.compactAndStringifyFragment(
+                        JsonLdUtils.compactAndSerializeFragment(
                             attributeName,
                             attributePayload!!,
                             contexts
@@ -94,7 +94,7 @@ class EntityEventService(
                         entityId,
                         compactTerm(attributeName, contexts),
                         updatedDetails.datasetId,
-                        JsonLdUtils.compactAndStringifyFragment(
+                        JsonLdUtils.compactAndSerializeFragment(
                             attributeName,
                             attributePayload!!,
                             contexts
@@ -117,7 +117,7 @@ class EntityEventService(
         updateResult.updated.forEach { updatedDetails ->
             val attributeName = updatedDetails.attributeName
             val attributePayload =
-                JsonLdUtils.getAttributeFromExpandedAttributes(
+                JsonLdUtils.getAttributeFromExpandedFragment(
                     jsonLdAttributes,
                     attributeName,
                     updatedDetails.datasetId
@@ -127,7 +127,7 @@ class EntityEventService(
                     entityId,
                     compactTerm(attributeName, contexts),
                     updatedDetails.datasetId,
-                    JsonLdUtils.compactAndStringifyFragment(
+                    JsonLdUtils.compactAndSerializeFragment(
                         attributeName,
                         attributePayload!!,
                         contexts
@@ -150,7 +150,7 @@ class EntityEventService(
         updatedDetails.forEach { updatedDetail ->
             val attributeName = updatedDetail.attributeName
             val attributePayload =
-                JsonLdUtils.getAttributeFromExpandedAttributes(
+                JsonLdUtils.getAttributeFromExpandedFragment(
                     jsonLdAttributes,
                     attributeName,
                     updatedDetail.datasetId
@@ -160,7 +160,7 @@ class EntityEventService(
                     entityId,
                     compactTerm(attributeName, contexts),
                     updatedDetail.datasetId,
-                    JsonLdUtils.compactAndStringifyFragment(
+                    JsonLdUtils.compactAndSerializeFragment(
                         attributePayload,
                         contexts
                     ),

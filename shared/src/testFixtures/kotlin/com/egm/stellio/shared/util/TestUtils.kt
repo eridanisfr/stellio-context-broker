@@ -7,11 +7,12 @@ import com.egm.stellio.shared.model.parseToNgsiLdAttributes
 import com.egm.stellio.shared.model.toNgsiLdEntity
 import com.egm.stellio.shared.util.JsonLdUtils.EGM_BASE_CONTEXT_URL
 import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_CORE_CONTEXT
+import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_EGM_CONTEXT
 import com.egm.stellio.shared.util.JsonLdUtils.expandJsonLdEntity
 import org.springframework.core.io.ClassPathResource
 
 val DEFAULT_CONTEXTS = listOf(
-    "https://fiware.github.io/data-models/context.jsonld",
+    NGSILD_EGM_CONTEXT,
     NGSILD_CORE_CONTEXT
 )
 

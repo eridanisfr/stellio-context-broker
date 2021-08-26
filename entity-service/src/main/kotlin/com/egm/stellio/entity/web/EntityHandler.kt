@@ -13,7 +13,8 @@ import com.egm.stellio.shared.util.JsonLdUtils.compactEntities
 import com.egm.stellio.shared.util.JsonLdUtils.expandJsonLdEntity
 import com.egm.stellio.shared.util.JsonLdUtils.expandJsonLdFragment
 import com.egm.stellio.shared.util.JsonLdUtils.expandJsonLdKey
-import com.egm.stellio.shared.util.JsonLdUtils.parseAndExpandAttributeFragment
+import com.egm.stellio.shared.util.JsonLdUtils.expandAttributeFragment
+import com.egm.stellio.shared.util.JsonLdUtils.filterJsonLdEntityOnAttributes
 import com.egm.stellio.shared.util.JsonLdUtils.reconstructPolygonCoordinates
 import com.egm.stellio.shared.util.JsonLdUtils.removeContextFromInput
 import com.egm.stellio.shared.util.JsonUtils.serializeObject
@@ -159,7 +160,7 @@ class EntityHandler(
             countAndEntities.second.filter { it.containsAnyOf(expandedAttrs) }
                 .map {
                     JsonLdEntity(
-                        JsonLdUtils.filterJsonLdEntityOnAttributes(it, expandedAttrs),
+                        filterJsonLdEntityOnAttributes(it, expandedAttrs),
                         it.contexts
                     )
                 }
@@ -215,7 +216,7 @@ class EntityHandler(
         val expandedAttrs = parseAndExpandRequestParameter(params.getFirst("attrs"), contextLink)
         if (jsonLdEntity.containsAnyOf(expandedAttrs)) {
             val filteredJsonLdEntity = JsonLdEntity(
-                JsonLdUtils.filterJsonLdEntityOnAttributes(jsonLdEntity, expandedAttrs),
+                filterJsonLdEntityOnAttributes(jsonLdEntity, expandedAttrs),
                 jsonLdEntity.contexts
             )
 
@@ -384,7 +385,7 @@ class EntityHandler(
         val expandedAttrId = expandJsonLdKey(attrId, contexts)!!
         checkAttributeIsAuthorized(expandedAttrId, entityUri, userId)
 
-        val expandedPayload = parseAndExpandAttributeFragment(attrId, body, contexts)
+        val expandedPayload = expandAttributeFragment(attrId, body, contexts)
 
         val updateResult = entityAttributeService.partialUpdateEntityAttribute(entityUri, expandedPayload, contexts)
 

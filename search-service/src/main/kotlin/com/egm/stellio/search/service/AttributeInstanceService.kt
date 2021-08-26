@@ -8,8 +8,8 @@ import com.egm.stellio.shared.util.JsonLdUtils.JSONLD_CONTEXT
 import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_OBSERVED_AT_PROPERTY
 import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_PROPERTY_VALUE
 import com.egm.stellio.shared.util.JsonLdUtils.compactFragment
-import com.egm.stellio.shared.util.JsonLdUtils.getPropertyValueFromMap
-import com.egm.stellio.shared.util.JsonLdUtils.getPropertyValueFromMapAsDateTime
+import com.egm.stellio.shared.util.JsonLdUtils.getPropertyValueFromObject
+import com.egm.stellio.shared.util.JsonLdUtils.getPropertyValueAsDateTime
 import io.r2dbc.postgresql.codec.Json
 import org.springframework.r2dbc.core.DatabaseClient
 import org.springframework.r2dbc.core.bind
@@ -52,9 +52,9 @@ class AttributeInstanceService(
         attributeValues: Map<String, List<Any>>,
         contexts: List<String>
     ): Mono<Int> {
-        val attributeValue = getPropertyValueFromMap(attributeValues, NGSILD_PROPERTY_VALUE)
+        val attributeValue = getPropertyValueFromObject(attributeValues, NGSILD_PROPERTY_VALUE)
             ?: throw BadRequestDataException("Attribute $attributeKey has an instance without a value")
-        val observedAt = getPropertyValueFromMapAsDateTime(attributeValues, NGSILD_OBSERVED_AT_PROPERTY)
+        val observedAt = getPropertyValueAsDateTime(attributeValues, NGSILD_OBSERVED_AT_PROPERTY)
             ?: throw BadRequestDataException("Attribute $attributeKey has an instance without an observed date")
 
         val attributeInstance = AttributeInstance(

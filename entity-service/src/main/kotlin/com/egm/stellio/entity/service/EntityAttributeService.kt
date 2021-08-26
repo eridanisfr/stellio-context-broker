@@ -10,6 +10,8 @@ import com.egm.stellio.shared.model.*
 import com.egm.stellio.shared.util.JsonLdUtils
 import com.egm.stellio.shared.util.JsonLdUtils.expandJsonLdKey
 import org.slf4j.LoggerFactory
+import jakarta.json.Json
+import jakarta.json.JsonObject
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 import java.net.URI
@@ -27,16 +29,16 @@ class EntityAttributeService(
     @Transactional
     fun partialUpdateEntityAttribute(
         entityId: URI,
-        expandedPayload: Map<String, List<Map<String, List<Any>>>>,
+        expandedPayload: JsonObject,
         contexts: List<String>
     ): UpdateResult {
-        val expandedAttributeName = expandedPayload.keys.first()
-        val attributeValues = expandedPayload.values.first()
+        val (expandedAttributeName, attributeValues) = expandedPayload.entries.first()
 
         logger.debug("Updating attribute $expandedAttributeName of entity $entityId with values: $attributeValues")
 
-        val updateResult = attributeValues.map { attributeInstanceValues ->
-            val datasetId = attributeInstanceValues.getDatasetId()
+        val updateResult = attributeValues.asJsonArray().map { attributeInstanceValues ->
+            val attributeInstanceObject = attributeInstanceValues.asJsonObject()
+            val datasetId = attributeInstanceObject.getDatasetId()
             when {
                 neo4jRepository.hasRelationshipInstance(
                     EntitySubjectNode(entityId),
@@ -46,7 +48,7 @@ class EntityAttributeService(
                     partialUpdateEntityRelationship(
                         entityId,
                         expandedAttributeName.toRelationshipTypeName(),
-                        attributeInstanceValues,
+                        attributeInstanceObject,
                         datasetId,
                         contexts
                     )
@@ -58,7 +60,7 @@ class EntityAttributeService(
                     partialUpdateEntityProperty(
                         entityId,
                         expandedAttributeName,
-                        attributeInstanceValues,
+                        attributeInstanceObject,
                         datasetId,
                         contexts
                     )
@@ -85,7 +87,7 @@ class EntityAttributeService(
     internal fun partialUpdateEntityRelationship(
         entityId: URI,
         relationshipType: String,
-        relationshipValues: Map<String, List<Any>>,
+        relationshipValues: JsonObject,
         datasetId: URI?,
         contexts: List<String>
     ): UpdateAttributeResult {
@@ -123,7 +125,7 @@ class EntityAttributeService(
     internal fun partialUpdateEntityProperty(
         entityId: URI,
         expandedPropertyName: String,
-        propertyValues: Map<String, List<Any>>,
+        propertyValues: JsonObject,
         datasetId: URI?,
         contexts: List<String>
     ): UpdateAttributeResult {
@@ -153,7 +155,7 @@ class EntityAttributeService(
 
     internal fun partialUpdateAttributesOfAttribute(
         attribute: Attribute,
-        attributeValues: Map<String, List<Any>>,
+        attributeValues: JsonObject,
         contexts: List<String>
     ): Boolean {
         return attributeValues.filterKeys {
@@ -161,11 +163,9 @@ class EntityAttributeService(
                 !NGSILD_RELATIONSHIPS_CORE_MEMBERS.contains(it)
             else
                 !NGSILD_PROPERTIES_CORE_MEMBERS.contains(it)
-        }.mapValues {
-            // attribute attributes cannot be multi-attributes, expand as Map
-            JsonLdUtils.expandValueAsMap(it.value)
         }.map {
             val attributeOfAttributeName = it.key
+            val attributeOfAttributeObject = it.value.asJsonObject()
             when {
                 neo4jRepository.hasRelationshipInstance(
                     AttributeSubjectNode(attribute.id()),
@@ -180,7 +180,7 @@ class EntityAttributeService(
                         attribute.id(),
                         attributeOfAttributeName.toRelationshipTypeName(),
                         null,
-                        it.value
+                        attributeOfAttributeObject
                     )
                 }
                 neo4jRepository.hasPropertyInstance(
@@ -193,20 +193,20 @@ class EntityAttributeService(
                     )
                     partialUpdatePropertyOfAttribute(
                         propertyOfAttribute,
-                        it.value
+                        attributeOfAttributeObject
                     )
                 }
                 else -> {
-                    if (isAttributeOfType(it.value, JsonLdUtils.NGSILD_RELATIONSHIP_TYPE)) {
+                    if (isAttributeOfType(attributeOfAttributeObject, JsonLdUtils.NGSILD_RELATIONSHIP_TYPE)) {
                         val ngsiLdRelationship = NgsiLdRelationship(
                             attributeOfAttributeName,
-                            listOf(it.value)
+                            Json.createArrayBuilder(listOf(it.value)).build()
                         )
                         entityService.createAttributeRelationships(attribute.id(), listOf(ngsiLdRelationship))
-                    } else if (isAttributeOfType(it.value, JsonLdUtils.NGSILD_PROPERTY_TYPE)) {
+                    } else if (isAttributeOfType(attributeOfAttributeObject, JsonLdUtils.NGSILD_PROPERTY_TYPE)) {
                         val ngsiLdProperty = NgsiLdProperty(
                             expandJsonLdKey(attributeOfAttributeName, contexts)!!,
-                            listOf(it.value)
+                            Json.createArrayBuilder(listOf(it.value)).build()
                         )
                         entityService.createAttributeProperties(attribute.id(), listOf(ngsiLdProperty))
                     } else false
@@ -220,7 +220,7 @@ class EntityAttributeService(
         attributeId: URI,
         relationshipType: String,
         datasetId: URI?,
-        relationshipValues: Map<String, List<Any>>
+        relationshipValues: JsonObject
     ): Boolean {
         updateRelationshipTargetOfAttribute(
             attributeId,
@@ -235,7 +235,7 @@ class EntityAttributeService(
 
     internal fun partialUpdatePropertyOfAttribute(
         propertyOfAttribute: Property,
-        propertyValues: Map<String, List<Any>>
+        propertyValues: JsonObject
     ): Boolean {
         val updatedProperty = propertyOfAttribute.updateValues(propertyValues)
         propertyRepository.save(updatedProperty)
@@ -246,7 +246,7 @@ class EntityAttributeService(
         attributeId: URI,
         relationshipType: String,
         datasetId: URI?,
-        relationshipValues: Map<String, List<Any>>
+        relationshipValues: JsonObject
     ): Boolean =
         JsonLdUtils.extractRelationshipObject(relationshipType, relationshipValues)
             .map { objectId ->

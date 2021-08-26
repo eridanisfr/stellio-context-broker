@@ -18,6 +18,7 @@ the<DependencyManagementExtension>().apply {
 dependencies {
     testFixturesImplementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
     testFixturesImplementation("com.fasterxml.jackson.module:jackson-module-kotlin")
+    testFixturesImplementation("org.glassfish:jakarta.json:2.0.0")
     testFixturesImplementation("org.springframework:spring-core")
     testFixturesImplementation("org.springframework.security:spring-security-oauth2-jose")
     testFixturesImplementation("org.springframework.security:spring-security-test")

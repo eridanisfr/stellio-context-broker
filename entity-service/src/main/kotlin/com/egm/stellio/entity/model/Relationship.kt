@@ -4,13 +4,17 @@ import com.egm.stellio.entity.config.Neo4jUriPropertyConverter
 import com.egm.stellio.shared.model.NgsiLdRelationshipInstance
 import com.egm.stellio.shared.util.JsonLdUtils
 import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_RELATIONSHIP_HAS_OBJECT
-import com.egm.stellio.shared.util.JsonLdUtils.getPropertyValueFromMapAsDateTime
-import com.egm.stellio.shared.util.JsonLdUtils.getPropertyValueFromMapAsString
+import com.egm.stellio.shared.util.JsonLdUtils.getPropertyValueAsDateTime
+import com.egm.stellio.shared.util.JsonLdUtils.getPropertyValueAsString
+import com.egm.stellio.shared.util.JsonLdUtils.toJsonObject
+import com.egm.stellio.shared.util.JsonLdUtils.toJsonString
 import com.egm.stellio.shared.util.extractShortTypeFromExpanded
 import com.egm.stellio.shared.util.toNgsiLdFormat
 import com.egm.stellio.shared.util.toUri
 import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.annotation.JsonProperty
+import jakarta.json.JsonObject
+import jakarta.json.JsonValue
 import org.springframework.data.annotation.LastModifiedDate
 import org.springframework.data.neo4j.core.convert.ConvertWith
 import org.springframework.data.neo4j.core.schema.DynamicLabels
@@ -64,38 +68,38 @@ data class Relationship(
             datasetId = ngsiLdRelationshipInstance.datasetId
         )
 
-    override fun serializeCoreProperties(includeSysAttrs: Boolean): MutableMap<String, Any> {
-        val resultEntity = mutableMapOf<String, Any>()
+    override fun serializeCoreProperties(includeSysAttrs: Boolean): MutableMap<String, JsonValue> {
+        val resultEntity = mutableMapOf<String, JsonValue>()
         if (includeSysAttrs) {
             resultEntity[JsonLdUtils.NGSILD_CREATED_AT_PROPERTY] = mapOf(
                 JsonLdUtils.JSONLD_TYPE to JsonLdUtils.NGSILD_DATE_TIME_TYPE,
                 JsonLdUtils.JSONLD_VALUE_KW to createdAt.toNgsiLdFormat()
-            )
+            ).toJsonObject()
 
             modifiedAt?.run {
                 resultEntity[JsonLdUtils.NGSILD_MODIFIED_AT_PROPERTY] = mapOf(
                     JsonLdUtils.JSONLD_TYPE to JsonLdUtils.NGSILD_DATE_TIME_TYPE,
                     JsonLdUtils.JSONLD_VALUE_KW to this.toNgsiLdFormat()
-                )
+                ).toJsonObject()
             }
         }
         observedAt?.run {
             resultEntity[JsonLdUtils.NGSILD_OBSERVED_AT_PROPERTY] = mapOf(
                 JsonLdUtils.JSONLD_TYPE to JsonLdUtils.NGSILD_DATE_TIME_TYPE,
                 JsonLdUtils.JSONLD_VALUE_KW to this.toNgsiLdFormat()
-            )
+            ).toJsonObject()
         }
 
         datasetId?.run {
             resultEntity[JsonLdUtils.NGSILD_DATASET_ID_PROPERTY] = mapOf(
                 JsonLdUtils.JSONLD_ID to this.toString()
-            )
+            ).toJsonObject()
         }
 
-        resultEntity[JsonLdUtils.NGSILD_RELATIONSHIP_HAS_OBJECT] = mapOf(
+        resultEntity[NGSILD_RELATIONSHIP_HAS_OBJECT] = mapOf(
             JsonLdUtils.JSONLD_ID to objectId.toString()
-        )
-        resultEntity[JsonLdUtils.JSONLD_TYPE] = JsonLdUtils.NGSILD_RELATIONSHIP_TYPE.uri
+        ).toJsonObject()
+        resultEntity[JsonLdUtils.JSONLD_TYPE] = JsonLdUtils.NGSILD_RELATIONSHIP_TYPE.uri.toJsonString()
 
         return resultEntity
     }
@@ -134,10 +138,10 @@ data class Relationship(
         return this
     }
 
-    fun updateValues(updateFragment: Map<String, List<Any>>): Relationship =
+    fun updateValues(updateFragment: JsonObject): Relationship =
         updateValues(
-            getPropertyValueFromMapAsString(updateFragment, NGSILD_RELATIONSHIP_HAS_OBJECT)?.toUri(),
-            getPropertyValueFromMapAsDateTime(updateFragment, JsonLdUtils.NGSILD_OBSERVED_AT_PROPERTY)
+            getPropertyValueAsString(updateFragment, NGSILD_RELATIONSHIP_HAS_OBJECT)?.toUri(),
+            getPropertyValueAsDateTime(updateFragment, JsonLdUtils.NGSILD_OBSERVED_AT_PROPERTY)
         )
 
     // neo4j forces us to have a list but we know we have only one dynamic label

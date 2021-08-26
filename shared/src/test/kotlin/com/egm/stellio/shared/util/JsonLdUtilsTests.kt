@@ -1,20 +1,24 @@
 package com.egm.stellio.shared.util
 
 import com.egm.stellio.shared.model.BadRequestDataException
-import com.egm.stellio.shared.model.CompactedJsonLdEntity
 import com.egm.stellio.shared.model.InvalidRequestException
 import com.egm.stellio.shared.model.LdContextNotAvailableException
+import com.egm.stellio.shared.model.toKeyValues
+import com.egm.stellio.shared.util.JsonLdUtils.JSONLD_ID
+import com.egm.stellio.shared.util.JsonLdUtils.JSONLD_VALUE_KW
+import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_CORE_CONTEXT
+import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_EGM_CONTEXT
 import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_RELATIONSHIP_HAS_OBJECT
 import com.egm.stellio.shared.util.JsonLdUtils.compact
+import com.egm.stellio.shared.util.JsonLdUtils.containsCoreContext
+import com.egm.stellio.shared.util.JsonLdUtils.expandJsonLdEntity
 import com.egm.stellio.shared.util.JsonLdUtils.expandJsonLdFragment
 import com.egm.stellio.shared.util.JsonLdUtils.expandJsonLdKey
 import com.egm.stellio.shared.util.JsonLdUtils.extractRelationshipObject
-import com.egm.stellio.shared.util.JsonLdUtils.getAttributeFromExpandedAttributes
+import com.egm.stellio.shared.util.JsonLdUtils.getAttributeFromExpandedFragment
 import com.egm.stellio.shared.util.JsonLdUtils.reconstructPolygonCoordinates
-import com.fasterxml.jackson.annotation.JsonInclude
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.databind.SerializationFeature
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.egm.stellio.shared.util.JsonLdUtils.serialize
+import jakarta.json.Json
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
@@ -25,12 +29,6 @@ import org.junit.jupiter.api.assertThrows
 import org.springframework.http.MediaType
 
 class JsonLdUtilsTests {
-
-    private val mapper: ObjectMapper =
-        jacksonObjectMapper()
-            .setSerializationInclusion(JsonInclude.Include.NON_NULL)
-            .findAndRegisterModules()
-            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
 
     private val normalizedJson =
         """
@@ -61,55 +59,42 @@ class JsonLdUtilsTests {
               }
            },
             "@context": [
-                "http://example.org/ngsi-ld/latest/commonTerms.jsonld",
-                "http://example.org/ngsi-ld/latest/vehicle.jsonld",
-                "http://example.org/ngsi-ld/latest/parking.jsonld",
-                "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context-v1.3.jsonld"
-            ]
-        }
-        """.trimIndent()
-
-    private val simplifiedJson =
-        """
-        {
-            "id": "urn:ngsi-ld:Vehicle:A4567",
-            "type": "Vehicle",
-            "brandName": "Mercedes",
-            "isParked": "urn:ngsi-ld:OffStreetParking:Downtown1",
-            "location": {
-             "type": "Point",
-             "coordinates": [
-                24.30623,
-                60.07966
-             ]
-           },
-            "@context": [
-                "http://example.org/ngsi-ld/latest/commonTerms.jsonld",
-                "http://example.org/ngsi-ld/latest/vehicle.jsonld",
-                "http://example.org/ngsi-ld/latest/parking.jsonld",
                 "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context-v1.3.jsonld"
             ]
         }
         """.trimIndent()
 
     @Test
-    fun `it should simplify a JSON-LD Map`() {
-        val mapper = ObjectMapper()
-        val normalizedMap = mapper.readValue(normalizedJson, Map::class.java)
-        val simplifiedMap = mapper.readValue(simplifiedJson, Map::class.java)
+    fun `it should render an entity as a keyValues object`() {
+        val expectedKeyValuesEntity =
+            """
+            {
+                "id": "urn:ngsi-ld:Vehicle:A4567",
+                "type": "Vehicle",
+                "brandName": "Mercedes",
+                "isParked": "urn:ngsi-ld:OffStreetParking:Downtown1",
+                "location": {
+                 "type": "Point",
+                 "coordinates": [
+                    24.30623,
+                    60.07966
+                 ]
+               },
+                "@context": [
+                    "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context-v1.3.jsonld"
+                ]
+            }
+            """.trimIndent()
 
-        val resultMap = (normalizedMap as CompactedJsonLdEntity).toKeyValues()
+        val keyValuesEntity = compact(expandJsonLdEntity(normalizedJson)).toKeyValues().serialize()
 
-        assertEquals(simplifiedMap, resultMap)
+        assertTrue(expectedKeyValuesEntity.matchContent(keyValuesEntity))
     }
 
     @Test
     fun `it should filter a JSON-LD Map on the attributes specified as well as the mandatory attributes`() {
-        val mapper = ObjectMapper()
-        val normalizedMap = mapper.readValue(normalizedJson, Map::class.java)
-
         val resultMap = JsonLdUtils.filterCompactedEntityOnAttributes(
-            normalizedMap as CompactedJsonLdEntity,
+            compact(expandJsonLdEntity(normalizedJson)),
             setOf("brandName", "location")
         )
 
@@ -132,17 +117,17 @@ class JsonLdUtilsTests {
             """.trimIndent()
 
         val exception = assertThrows<InvalidRequestException> {
-            parseAndExpandJsonLdFragment(rawEntity)
+            expandJsonLdFragment(rawEntity)
         }
         assertEquals(
-            "Unexpected error while parsing payload : Unexpected character (',' (code 44)): was expecting" +
-                " double-quote to start field name\n at [Source: (BufferedReader); line: 2, column: 39]",
+            "Unexpected error while parsing payload : " +
+                "Invalid token=COMMA at (line no=2, column no=38, offset=39). Expected tokens are: [STRING]",
             exception.message
         )
     }
 
     @Test
-    fun `it should throw a LdContextNotAvailable exception if the provided JSON-LD context is not available`() {
+    fun `it should throw a LdContextNotAvailable exception if the provided JSON-LD context is not absolute`() {
         val rawEntity =
             """
             {
@@ -155,11 +140,33 @@ class JsonLdUtilsTests {
             """.trimIndent()
 
         val exception = assertThrows<LdContextNotAvailableException> {
-            parseAndExpandJsonLdFragment(rawEntity)
+            expandJsonLdFragment(rawEntity)
         }
         assertEquals(
-            "Unable to load remote context (cause was: com.github.jsonldjava.core.JsonLdError: " +
-                "loading remote context failed: unknownContext)",
+            "Unable to load remote context (cause was: Context URI is not absolute [unknownContext].)",
+            exception.message
+        )
+    }
+
+    @Test
+    fun `it should throw a LdContextNotAvailable exception if the provided JSON-LD context is not resolvable`() {
+        val rawEntity =
+            """
+            {
+                "id": "urn:ngsi-ld:Device:01234",
+                "type": "Device",
+                "@context": [
+                    "https://localhost/unknown.jsonld"
+                ]
+            }
+            """.trimIndent()
+
+        val exception = assertThrows<LdContextNotAvailableException> {
+            expandJsonLdFragment(rawEntity)
+        }
+        assertEquals(
+            "Unable to load remote context (cause was: " +
+                "There was a problem encountered loading a remote context [code=LOADING_REMOTE_CONTEXT_FAILED].)",
             exception.message
         )
     }
@@ -170,13 +177,13 @@ class JsonLdUtilsTests {
             """
             {
                 "@context": [
-                    "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context-v1.3.jsonld"
+                    "$NGSILD_CORE_CONTEXT"
                 ]
             }
             """.trimIndent()
 
         val exception = assertThrows<BadRequestDataException> {
-            parseAndExpandJsonLdFragment(rawEntity)
+            expandJsonLdFragment(rawEntity)
         }
         assertEquals(
             "Unable to parse input payload",
@@ -185,12 +192,22 @@ class JsonLdUtilsTests {
     }
 
     @Test
+    fun `it should not find the core context if it is not included`() {
+        assertFalse(containsCoreContext(listOf(NGSILD_EGM_CONTEXT)))
+    }
+
+    @Test
+    fun `it should find the core context if it is included`() {
+        assertTrue(containsCoreContext(DEFAULT_CONTEXTS))
+    }
+
+    @Test
     fun `it should return an error if a relationship has no object field`() {
-        val relationshipValues = mapOf(
-            "value" to listOf("something")
-        )
+        val relationshipValues =
+            Json.createObjectBuilder().add("value", Json.createArrayBuilder().add("something")).build()
 
         val result = extractRelationshipObject("isARelationship", relationshipValues)
+
         assertTrue(result.isLeft())
         result.mapLeft {
             assertEquals("Relationship isARelationship does not have an object field", it.message)
@@ -199,11 +216,11 @@ class JsonLdUtilsTests {
 
     @Test
     fun `it should return an error if a relationship has an empty object`() {
-        val relationshipValues = mapOf(
-            NGSILD_RELATIONSHIP_HAS_OBJECT to emptyList<Any>()
-        )
+        val relationshipValues =
+            Json.createObjectBuilder().add(NGSILD_RELATIONSHIP_HAS_OBJECT, Json.createArrayBuilder()).build()
 
         val result = extractRelationshipObject("isARelationship", relationshipValues)
+
         assertTrue(result.isLeft())
         result.mapLeft {
             assertEquals("Relationship isARelationship is empty", it.message)
@@ -212,45 +229,60 @@ class JsonLdUtilsTests {
 
     @Test
     fun `it should return an error if a relationship has an invalid object type`() {
-        val relationshipValues = mapOf(
-            NGSILD_RELATIONSHIP_HAS_OBJECT to listOf("invalid")
-        )
+        val relationshipValues =
+            Json.createObjectBuilder()
+                .add(NGSILD_RELATIONSHIP_HAS_OBJECT, Json.createArrayBuilder().add("invalid"))
+                .build()
 
         val result = extractRelationshipObject("isARelationship", relationshipValues)
+
         assertTrue(result.isLeft())
         result.mapLeft {
-            assertEquals("Relationship isARelationship has an invalid object type: class java.lang.String", it.message)
+            assertEquals(
+                "Relationship isARelationship has an invalid object type: class org.glassfish.json.JsonStringImpl",
+                it.message
+            )
         }
     }
 
     @Test
     fun `it should return an error if a relationship has object without id`() {
-        val relationshipValues = mapOf(
-            NGSILD_RELATIONSHIP_HAS_OBJECT to listOf(
-                mapOf("@value" to "urn:ngsi-ld:T:misplacedRelationshipObject")
-            )
-        )
+        val relationshipValues =
+            Json.createObjectBuilder()
+                .add(
+                    NGSILD_RELATIONSHIP_HAS_OBJECT,
+                    Json.createArrayBuilder()
+                        .add(Json.createObjectBuilder().add(JSONLD_VALUE_KW, "urn:ngsi-ld:T:misplacedRelationshipObject"))
+                )
+                .build()
 
         val result = extractRelationshipObject("isARelationship", relationshipValues)
+
         assertTrue(result.isLeft())
         result.mapLeft {
-            assertEquals("Relationship isARelationship has an invalid or no object id: null", it.message)
+            assertEquals(
+                "Relationship isARelationship has an invalid or no object id: {\"@value\":\"urn:ngsi-ld:T:misplacedRelationshipObject\"}",
+                it.message
+            )
         }
     }
 
     @Test
     fun `it should extract the target object of a relationship`() {
-        val relationshipObjectId = "urn:ngsi-ld:T:1"
-        val relationshipValues = mapOf(
-            NGSILD_RELATIONSHIP_HAS_OBJECT to listOf(
-                mapOf("@id" to relationshipObjectId)
-            )
-        )
+        val relationshipValues =
+            Json.createObjectBuilder()
+                .add(
+                    NGSILD_RELATIONSHIP_HAS_OBJECT,
+                    Json.createArrayBuilder()
+                        .add(Json.createObjectBuilder().add(JSONLD_ID, "urn:ngsi-ld:T:1"))
+                )
+                .build()
 
         val result = extractRelationshipObject("isARelationship", relationshipValues)
+
         assertTrue(result.isRight())
         result.map {
-            assertEquals(relationshipObjectId.toUri(), it)
+            assertEquals("urn:ngsi-ld:T:1".toUri(), it)
         }
     }
 
@@ -264,10 +296,10 @@ class JsonLdUtilsTests {
             }
             """.trimIndent()
 
-        val jsonLdEntity = JsonLdUtils.expandJsonLdEntity(entity, DEFAULT_CONTEXTS)
-        val compactedEntity = compact(jsonLdEntity, DEFAULT_CONTEXTS, MediaType.APPLICATION_JSON)
+        val jsonLdEntity = expandJsonLdEntity(entity, listOf(NGSILD_CORE_CONTEXT))
+        val compactedEntity = compact(jsonLdEntity, listOf(NGSILD_CORE_CONTEXT), MediaType.APPLICATION_JSON)
 
-        assertTrue(mapper.writeValueAsString(compactedEntity).matchContent(entity))
+        assertTrue(compactedEntity.serialize().matchContent(entity))
     }
 
     @Test
@@ -285,16 +317,15 @@ class JsonLdUtilsTests {
                 "id":"urn:ngsi-ld:Device:01234",
                 "type":"Device",
                 "@context":[
-                    "https://fiware.github.io/data-models/context.jsonld",
-                    "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context-v1.3.jsonld"
+                    "$NGSILD_CORE_CONTEXT"
                 ]
             }
             """.trimIndent()
 
-        val jsonLdEntity = JsonLdUtils.expandJsonLdEntity(entity, DEFAULT_CONTEXTS)
-        val compactedEntity = compact(jsonLdEntity, DEFAULT_CONTEXTS)
+        val jsonLdEntity = expandJsonLdEntity(entity, listOf(NGSILD_CORE_CONTEXT))
+        val compactedEntity = compact(jsonLdEntity, listOf(NGSILD_CORE_CONTEXT))
 
-        assertTrue(mapper.writeValueAsString(compactedEntity).matchContent(expectedEntity))
+        assertTrue(compactedEntity.serialize().matchContent(expectedEntity))
     }
 
     @Test
@@ -309,7 +340,7 @@ class JsonLdUtilsTests {
             """.trimIndent()
 
         val expandedAttributes = expandJsonLdFragment(entityFragment, DEFAULT_CONTEXTS)
-        assertNull(getAttributeFromExpandedAttributes(expandedAttributes, "unknownAttribute", null))
+        assertNull(getAttributeFromExpandedFragment(expandedAttributes, "unknownAttribute", null))
     }
 
     @Test
@@ -330,9 +361,9 @@ class JsonLdUtilsTests {
         val expandedAttributes = expandJsonLdFragment(entityFragment, DEFAULT_CONTEXTS)
         val expandedBrandName = expandJsonLdKey("brandName", DEFAULT_CONTEXTS)!!
 
-        assertNotNull(getAttributeFromExpandedAttributes(expandedAttributes, expandedBrandName, null))
+        assertNotNull(getAttributeFromExpandedFragment(expandedAttributes, expandedBrandName, null))
         assertNull(
-            getAttributeFromExpandedAttributes(expandedAttributes, expandedBrandName, "urn:datasetId".toUri())
+            getAttributeFromExpandedFragment(expandedAttributes, expandedBrandName, "urn:datasetId".toUri())
         )
     }
 
@@ -357,21 +388,21 @@ class JsonLdUtilsTests {
             }
             """.trimIndent()
 
-        val expandedAttributes = expandJsonLdFragment(entityFragment, DEFAULT_CONTEXTS)
+        val expandedFragment = expandJsonLdFragment(entityFragment, DEFAULT_CONTEXTS)
         val expandedBrandName = expandJsonLdKey("brandName", DEFAULT_CONTEXTS)!!
         val expandedName = expandJsonLdKey("name", DEFAULT_CONTEXTS)!!
 
-        assertNotNull(getAttributeFromExpandedAttributes(expandedAttributes, expandedBrandName, null))
+        assertNotNull(getAttributeFromExpandedFragment(expandedFragment, expandedBrandName, null))
         assertNotNull(
-            getAttributeFromExpandedAttributes(expandedAttributes, expandedBrandName, "urn:datasetId:1".toUri())
+            getAttributeFromExpandedFragment(expandedFragment, expandedBrandName, "urn:datasetId:1".toUri())
         )
         assertNull(
-            getAttributeFromExpandedAttributes(expandedAttributes, expandedBrandName, "urn:datasetId:2".toUri())
+            getAttributeFromExpandedFragment(expandedFragment, expandedBrandName, "urn:datasetId:2".toUri())
         )
         assertNotNull(
-            getAttributeFromExpandedAttributes(expandedAttributes, expandedName, "urn:datasetId:1".toUri())
+            getAttributeFromExpandedFragment(expandedFragment, expandedName, "urn:datasetId:1".toUri())
         )
-        assertNull(getAttributeFromExpandedAttributes(expandedAttributes, expandedName, null))
+        assertNull(getAttributeFromExpandedFragment(expandedFragment, expandedName, null))
     }
 
     @Test
@@ -386,11 +417,11 @@ class JsonLdUtilsTests {
                   "value":{
                      "type":"Polygon",
                      "coordinates":[
-                        [100.0,0.0],
+                        [[100.0,0.0],
                         [101.0,0.0],
                         [101.0,1.0],
                         [100.0,1.0],
-                        [100.0,0.0]
+                        [100.0,0.0]]
                      ]
                   }
                }
@@ -406,20 +437,20 @@ class JsonLdUtilsTests {
                   "value":{
                      "type":"Polygon",
                      "coordinates":[
-                        [100.0,0.0],
+                        [[100.0,0.0],
                         [101.0,0.0],
                         [101.0,1.0],
                         [100.0,1.0],
-                        [100.0,0.0]
+                        [100.0,0.0]]
                      ]
                   }
                }
             }
             """.trimIndent()
 
-        val jsonLdEntity = JsonLdUtils.expandJsonLdEntity(entity, DEFAULT_CONTEXTS)
+        val jsonLdEntity = expandJsonLdEntity(entity, DEFAULT_CONTEXTS)
         val compactedEntity = compact(jsonLdEntity, DEFAULT_CONTEXTS, MediaType.APPLICATION_JSON).toMutableMap()
         reconstructPolygonCoordinates(compactedEntity)
-        assertTrue(mapper.writeValueAsString(compactedEntity).matchContent(expectedEntity))
+        assertTrue(compactedEntity.serialize().matchContent(expectedEntity))
     }
 }

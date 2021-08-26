@@ -5,6 +5,8 @@ import com.egm.stellio.shared.util.JsonLdUtils.JSONLD_VALUE_KW
 import com.egm.stellio.shared.util.JsonLdUtils.expandJsonLdEntity
 import com.egm.stellio.shared.util.JsonLdUtils.expandJsonLdFragment
 import com.egm.stellio.shared.util.toUri
+import jakarta.json.Json
+import jakarta.json.JsonArray
 import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
@@ -31,7 +33,7 @@ class NgsiLdEntityTests {
         val ngsiLdEntity = expandJsonLdEntity(rawEntity, DEFAULT_CONTEXTS)
 
         assertEquals("urn:ngsi-ld:Device:01234", ngsiLdEntity.id)
-        assertEquals("https://uri.fiware.org/ns/data-models#Device", ngsiLdEntity.type)
+        assertEquals("https://ontology.eglobalmark.com/egm#Device", ngsiLdEntity.type)
     }
 
     @Test
@@ -153,7 +155,7 @@ class NgsiLdEntityTests {
 
         assertEquals(1, ngsiLdEntity.properties.size)
         val ngsiLdProperty = ngsiLdEntity.properties[0]
-        assertEquals("https://uri.fiware.org/ns/data-models#deviceState", ngsiLdProperty.name)
+        assertEquals("https://uri.etsi.org/ngsi-ld/default-context/deviceState", ngsiLdProperty.name)
         assertEquals(1, ngsiLdProperty.instances.size)
         val ngsiLdPropertyInstance = ngsiLdProperty.instances[0]
         assertEquals("Open", ngsiLdPropertyInstance.value)
@@ -200,7 +202,7 @@ class NgsiLdEntityTests {
 
         assertEquals(1, ngsiLdEntity.properties.size)
         val ngsiLdProperty = ngsiLdEntity.properties[0]
-        assertEquals("https://uri.fiware.org/ns/data-models#deviceState", ngsiLdProperty.name)
+        assertEquals("https://uri.etsi.org/ngsi-ld/default-context/deviceState", ngsiLdProperty.name)
         assertEquals(1, ngsiLdProperty.instances.size)
         val ngsiLdPropertyInstance = ngsiLdProperty.instances[0]
         assertTrue(ngsiLdPropertyInstance.value is Map<*, *>)
@@ -214,8 +216,8 @@ class NgsiLdEntityTests {
             valueMap.keys
         )
         assertEquals(
-            listOf(mapOf(JSONLD_VALUE_KW to "open")),
-            valueMap["https://uri.etsi.org/ngsi-ld/default-context/state1"]
+            Json.createValue("open"),
+            (valueMap["https://uri.etsi.org/ngsi-ld/default-context/state1"] as JsonArray)[0].asJsonObject()[JSONLD_VALUE_KW]
         )
     }
 
@@ -299,7 +301,7 @@ class NgsiLdEntityTests {
             )
         }
         assertEquals(
-            "Attribute https://uri.fiware.org/ns/data-models#deviceState instances must have the same type",
+            "Attribute https://uri.etsi.org/ngsi-ld/default-context/deviceState instances must have the same type",
             exception.message
         )
     }
@@ -339,7 +341,7 @@ class NgsiLdEntityTests {
             )
         }
         assertEquals(
-            "Attribute https://uri.fiware.org/ns/data-models#deviceState " +
+            "Attribute https://uri.etsi.org/ngsi-ld/default-context/deviceState " +
                 "can't have more than one instance with the same datasetId",
             exception.message
         )
@@ -374,7 +376,7 @@ class NgsiLdEntityTests {
             )
         }
         assertEquals(
-            "Attribute https://uri.fiware.org/ns/data-models#deviceState can't have more than one default instance",
+            "Attribute https://uri.etsi.org/ngsi-ld/default-context/deviceState can't have more than one default instance",
             exception.message
         )
     }
@@ -422,7 +424,7 @@ class NgsiLdEntityTests {
 
         assertEquals(1, ngsiLdEntity.relationships.size)
         val ngsiLdRelationship = ngsiLdEntity.relationships[0]
-        assertEquals("https://uri.fiware.org/ns/data-models#refDeviceModel", ngsiLdRelationship.name)
+        assertEquals("https://uri.etsi.org/ngsi-ld/default-context/refDeviceModel", ngsiLdRelationship.name)
         assertEquals(1, ngsiLdRelationship.instances.size)
         val ngsiLdRelationshipInstance = ngsiLdRelationship.instances[0]
         assertEquals("urn:ngsi-ld:DeviceModel:09876".toUri(), ngsiLdRelationshipInstance.objectId)
@@ -506,7 +508,7 @@ class NgsiLdEntityTests {
             )
         }
         assertEquals(
-            "Attribute https://uri.fiware.org/ns/data-models#refDeviceModel can't have more than one default instance",
+            "Attribute https://uri.etsi.org/ngsi-ld/default-context/refDeviceModel can't have more than one default instance",
             exception.message
         )
     }
@@ -537,7 +539,7 @@ class NgsiLdEntityTests {
             )
         }
         assertEquals(
-            "Attribute https://uri.fiware.org/ns/data-models#refDeviceModel " +
+            "Attribute https://uri.etsi.org/ngsi-ld/default-context/refDeviceModel " +
                 "can't have more than one instance with the same datasetId",
             exception.message
         )
@@ -573,7 +575,7 @@ class NgsiLdEntityTests {
             )
         }
         assertEquals(
-            "Attribute https://uri.fiware.org/ns/data-models#refDeviceModel instances must have the same type",
+            "Attribute https://uri.etsi.org/ngsi-ld/default-context/refDeviceModel instances must have the same type",
             exception.message
         )
     }

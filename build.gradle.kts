@@ -63,7 +63,8 @@ subprojects {
         implementation("org.springframework.kafka:spring-kafka")
 
         implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
-        implementation("com.github.jsonld-java:jsonld-java:0.13.3")
+        implementation("com.apicatalog:titanium-json-ld:1.1.0")
+        implementation("org.glassfish:jakarta.json:2.0.0")
 
         implementation("io.arrow-kt:arrow-fx:0.10.4")
         implementation("io.arrow-kt:arrow-syntax:0.10.4")

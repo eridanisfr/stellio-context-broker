@@ -3,7 +3,7 @@ package com.egm.stellio.entity.service
 import com.egm.stellio.shared.model.*
 import com.egm.stellio.shared.util.JsonLdUtils
 import com.egm.stellio.shared.util.JsonLdUtils.compactAndSerialize
-import com.egm.stellio.shared.util.JsonLdUtils.parseAndExpandAttributeFragment
+import com.egm.stellio.shared.util.JsonLdUtils.expandAttributeFragment
 import com.egm.stellio.shared.util.JsonUtils.deserializeAs
 import org.slf4j.LoggerFactory
 import org.springframework.http.MediaType
@@ -49,7 +49,7 @@ class ObservationEventListener(
     }
 
     fun handleAttributeUpdateEvent(observationEvent: AttributeUpdateEvent) {
-        val expandedPayload = parseAndExpandAttributeFragment(
+        val expandedPayload = expandAttributeFragment(
             observationEvent.attributeName,
             observationEvent.operationPayload,
             observationEvent.contexts
@@ -93,7 +93,7 @@ class ObservationEventListener(
     }
 
     fun handleAttributeAppendEvent(observationEvent: AttributeAppendEvent) {
-        val expandedPayload = parseAndExpandAttributeFragment(
+        val expandedPayload = expandAttributeFragment(
             observationEvent.attributeName,
             observationEvent.operationPayload,
             observationEvent.contexts

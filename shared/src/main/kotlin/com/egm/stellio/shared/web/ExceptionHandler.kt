@@ -1,9 +1,9 @@
 package com.egm.stellio.shared.web
 
+import com.apicatalog.jsonld.JsonLdError
 import com.egm.stellio.shared.model.*
 import com.egm.stellio.shared.util.JsonUtils.serializeObject
 import com.fasterxml.jackson.core.JsonParseException
-import com.github.jsonldjava.core.JsonLdError
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
@@ -34,7 +34,7 @@ class ExceptionHandler {
             )
             is JsonLdError -> generateErrorResponse(
                 HttpStatus.BAD_REQUEST,
-                JsonLdErrorResponse(cause.type.toString(), cause.message.orEmpty())
+                JsonLdErrorResponse(cause.code.toString(), cause.message.orEmpty())
             )
             is JsonParseException -> generateErrorResponse(
                 HttpStatus.BAD_REQUEST,
