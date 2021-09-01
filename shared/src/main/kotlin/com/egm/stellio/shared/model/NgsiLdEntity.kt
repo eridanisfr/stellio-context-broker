@@ -24,6 +24,7 @@ import com.egm.stellio.shared.util.JsonLdUtils.getPropertyValueAsDateTime
 import com.egm.stellio.shared.util.JsonLdUtils.getPropertyValueAsString
 import com.egm.stellio.shared.util.extractShortTypeFromExpanded
 import com.egm.stellio.shared.util.toUri
+import jakarta.json.Json
 import jakarta.json.JsonArray
 import jakarta.json.JsonNumber
 import jakarta.json.JsonObject
@@ -408,7 +409,7 @@ fun String.isNgsiLdSupportedName() =
     this.all { char -> char.isLetterOrDigit() || listOf(':', '_').contains(char) }
 
 fun JsonLdEntity.toNgsiLdEntity(): NgsiLdEntity =
-    NgsiLdEntity(this.properties, this.contexts)
+    NgsiLdEntity(Json.createObjectBuilder(this.properties).build(), this.contexts)
 
 fun JsonObject.getDatasetId(): URI? =
     this[NGSILD_DATASET_ID_PROPERTY]?.asJsonArray()?.get(0)?.asJsonObject()?.getString(JSONLD_ID)?.toUri()

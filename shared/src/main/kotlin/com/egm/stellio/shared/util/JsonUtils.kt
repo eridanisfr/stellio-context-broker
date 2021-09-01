@@ -6,6 +6,8 @@ import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.databind.ser.impl.SimpleBeanPropertyFilter
 import com.fasterxml.jackson.databind.ser.impl.SimpleFilterProvider
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import jakarta.json.Json
+import jakarta.json.JsonObject
 import kotlin.reflect.KClass
 
 object JsonUtils {
@@ -50,3 +52,6 @@ object JsonUtils {
         return mapperWithMixin.writer(filterProvider).writeValueAsString(input)
     }
 }
+
+fun String.deserialize(): JsonObject =
+    Json.createReader(this.byteInputStream()).readObject()

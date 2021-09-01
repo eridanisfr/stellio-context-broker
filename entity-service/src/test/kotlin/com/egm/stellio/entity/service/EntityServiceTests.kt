@@ -12,6 +12,9 @@ import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_PROPERTY_TYPE
 import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_PROPERTY_VALUE
 import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_UNIT_CODE_PROPERTY
 import com.egm.stellio.shared.util.JsonLdUtils.expandJsonLdFragment
+import com.egm.stellio.shared.util.JsonLdUtils.toJsonArray
+import com.egm.stellio.shared.util.JsonLdUtils.toJsonObject
+import com.egm.stellio.shared.util.JsonLdUtils.toJsonString
 import com.ninjasquad.springmockk.MockkBean
 import io.mockk.*
 import junit.framework.TestCase.assertTrue
@@ -63,8 +66,8 @@ class EntityServiceTests {
         every { neo4jRepository.createPropertyOfSubject(any(), any()) } returns true
         every { entityRepository.getEntityCoreById(any()) } returns mockedBreedingService
         every { mockedBreedingService.serializeCoreProperties(true) } returns mutableMapOf(
-            "@id" to mortalityRemovalServiceUri.toString(),
-            "@type" to listOf("MortalityRemovalService")
+            "@id" to mortalityRemovalServiceUri.toString().toJsonString(),
+            "@type" to listOf("MortalityRemovalService").toJsonArray()
         )
         every { mockedBreedingService.contexts } returns sampleDataWithContext.contexts
 
@@ -427,7 +430,7 @@ class EntityServiceTests {
                         "@value" to "2019-12-18T10:45:44.248755Z"
                     )
                 )
-            )
+            ).toJsonObject()
         )
 
         val mockkedEntity = mockkClass(Entity::class)

@@ -11,6 +11,7 @@ import com.egm.stellio.shared.util.JsonLdUtils.compactFragment
 import com.egm.stellio.shared.util.JsonLdUtils.getPropertyValueFromObject
 import com.egm.stellio.shared.util.JsonLdUtils.getPropertyValueAsDateTime
 import io.r2dbc.postgresql.codec.Json
+import jakarta.json.JsonObject
 import org.springframework.r2dbc.core.DatabaseClient
 import org.springframework.r2dbc.core.bind
 import org.springframework.stereotype.Service
@@ -49,7 +50,7 @@ class AttributeInstanceService(
     fun addAttributeInstance(
         temporalEntityAttributeUuid: UUID,
         attributeKey: String,
-        attributeValues: Map<String, List<Any>>,
+        attributeValues: JsonObject,
         contexts: List<String>
     ): Mono<Int> {
         val attributeValue = getPropertyValueFromObject(attributeValues, NGSILD_PROPERTY_VALUE)

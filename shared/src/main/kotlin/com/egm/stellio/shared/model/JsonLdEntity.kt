@@ -28,7 +28,7 @@ data class JsonLdEntity(
     // FIXME kinda hacky but we often just need the id or type... how can it be improved?
     val id by lazy {
         (properties[JSONLD_ID] as JsonString).string
-            ?: InternalErrorException("Could not extract id from JSON-LD entity")
+            ?: throw InternalErrorException("Could not extract id from JSON-LD entity")
     }
 
     val type by lazy {

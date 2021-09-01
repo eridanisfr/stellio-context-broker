@@ -12,9 +12,9 @@ import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_DATE_TYPE
 import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_PROPERTY_VALUE
 import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_TIME_TYPE
 import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_UNIT_CODE_PROPERTY
-import com.egm.stellio.shared.util.JsonLdUtils.getPropertyValueFromObject
 import com.egm.stellio.shared.util.JsonLdUtils.getPropertyValueAsDateTime
 import com.egm.stellio.shared.util.JsonLdUtils.getPropertyValueAsString
+import com.egm.stellio.shared.util.JsonLdUtils.getPropertyValueFromObject
 import com.egm.stellio.shared.util.JsonLdUtils.toJsonObject
 import com.egm.stellio.shared.util.JsonLdUtils.toJsonString
 import com.egm.stellio.shared.util.JsonUtils.serializeObject

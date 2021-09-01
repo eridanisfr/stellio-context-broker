@@ -9,6 +9,7 @@ import com.egm.stellio.shared.util.JsonLdUtils.JSONLD_CONTEXT
 import com.egm.stellio.shared.util.JsonLdUtils.expandJsonLdEntities
 import com.egm.stellio.shared.util.JsonLdUtils.extractContextFromInput
 import com.egm.stellio.shared.util.JsonLdUtils.removeContextFromInput
+import com.egm.stellio.shared.util.JsonLdUtils.toJsonObject
 import com.egm.stellio.shared.util.JsonUtils.serializeObject
 import com.egm.stellio.shared.web.extractSubjectOrEmpty
 import kotlinx.coroutines.reactive.awaitFirst
@@ -255,7 +256,7 @@ class EntityOperationHandler(
             val jsonLdEntity = jsonLdEntities.find { jsonLdEntity -> jsonLdEntity.id.toUri() == it.entityId }!!
             entityEventService.publishAppendEntityAttributesEvents(
                 it.entityId,
-                jsonLdEntity.properties,
+                jsonLdEntity.properties.toJsonObject(),
                 it.updateResult!!,
                 entityOperationService.getFullEntityById(it.entityId, true)!!,
                 jsonLdEntity.contexts

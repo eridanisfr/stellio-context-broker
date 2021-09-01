@@ -13,6 +13,7 @@ import com.egm.stellio.shared.util.APIC_COMPOUND_CONTEXT
 import com.egm.stellio.shared.util.JSON_LD_MEDIA_TYPE
 import com.egm.stellio.shared.util.JsonUtils.deserializeObject
 import com.egm.stellio.shared.util.buildContextLinkHeader
+import com.egm.stellio.shared.util.deserialize
 import com.egm.stellio.shared.util.entityNotFoundMessage
 import com.egm.stellio.shared.util.loadSampleData
 import com.egm.stellio.shared.util.toUri
@@ -549,7 +550,7 @@ class TemporalEntityHandlerTests {
         else
             "beehive_with_two_temporal_attributes_evolution.jsonld"
 
-        val entityWith2temporalEvolutions = deserializeObject(loadSampleData(entityFileName))
+        val entityWith2temporalEvolutions = loadSampleData(entityFileName).deserialize()
         every { temporalEntityAttributeService.getForEntity(any(), any()) } returns Flux.just(
             entityTemporalProperties[0],
             entityTemporalProperties[1]
@@ -654,10 +655,10 @@ class TemporalEntityHandlerTests {
 
     @Test
     fun `it should return 200 with jsonld response body for query temporal entities`() {
-        val firstTemporalEntity = deserializeObject(
+        val firstTemporalEntity =
             loadSampleData("beehive_with_two_temporal_attributes_evolution.jsonld")
-        ).minus("@context")
-        val secondTemporalEntity = deserializeObject(loadSampleData("beehive.jsonld")).minus("@context")
+                .deserialize().minus("@context")
+        val secondTemporalEntity = loadSampleData("beehive.jsonld").deserialize().minus("@context")
 
         every { queryService.parseAndCheckQueryParams(any(), any()) } returns mapOf(
             "ids" to emptySet<URI>(),
@@ -686,10 +687,10 @@ class TemporalEntityHandlerTests {
 
     @Test
     fun `it should return 200 with json response body for query temporal entities`() {
-        val firstTemporalEntity = deserializeObject(
+        val firstTemporalEntity =
             loadSampleData("beehive_with_two_temporal_attributes_evolution.jsonld")
-        ).minus("@context")
-        val secondTemporalEntity = deserializeObject(loadSampleData("beehive.jsonld")).minus("@context")
+                .deserialize().minus("@context")
+        val secondTemporalEntity = loadSampleData("beehive.jsonld").deserialize().minus("@context")
 
         every { queryService.parseAndCheckQueryParams(any(), any()) } returns mapOf(
             "ids" to emptySet<URI>(),

@@ -18,7 +18,7 @@ import com.egm.stellio.shared.model.extractAttributeInstance
 import com.egm.stellio.shared.model.toNgsiLdEntity
 import com.egm.stellio.shared.util.JsonLdUtils
 import com.egm.stellio.shared.util.JsonLdUtils.compactTerm
-import com.egm.stellio.shared.util.JsonUtils
+import com.egm.stellio.shared.util.deserialize
 import com.egm.stellio.shared.util.toUri
 import io.r2dbc.postgresql.codec.Json
 import io.r2dbc.spi.Row
@@ -97,7 +97,7 @@ class TemporalEntityAttributeService(
 
     fun createEntityTemporalReferences(payload: String, contexts: List<String>): Mono<Int> {
         val entity = JsonLdUtils.expandJsonLdEntity(payload, contexts).toNgsiLdEntity()
-        val parsedPayload = JsonUtils.deserializeObject(payload)
+        val parsedPayload = payload.deserialize()
 
         logger.debug("Analyzing create event for entity ${entity.id}")
 

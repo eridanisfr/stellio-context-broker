@@ -13,6 +13,7 @@ import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_CORE_CONTEXT
 import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_DATE_TIME_TYPE
 import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_OBSERVED_AT_PROPERTY
 import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_PROPERTY_VALUE
+import com.egm.stellio.shared.util.JsonLdUtils.toJsonObject
 import com.egm.stellio.shared.util.matchContent
 import com.egm.stellio.shared.util.toUri
 import io.mockk.confirmVerified
@@ -380,7 +381,7 @@ class AttributeInstanceServiceTests : WithTimescaleContainer {
                     JSONLD_VALUE_KW to 550.0
                 )
             )
-        )
+        ).toJsonObject()
 
         attributeInstanceService.addAttributeInstance(
             temporalEntityAttribute.id,
@@ -421,7 +422,7 @@ class AttributeInstanceServiceTests : WithTimescaleContainer {
                     JSONLD_TYPE to NGSILD_DATE_TIME_TYPE
                 )
             ),
-        )
+        ).toJsonObject()
 
         val exception = assertThrows<BadRequestDataException>("It should have thrown a BadRequestDataException") {
             attributeInstanceService.addAttributeInstance(

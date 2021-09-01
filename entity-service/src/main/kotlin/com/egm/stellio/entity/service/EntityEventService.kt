@@ -14,6 +14,7 @@ import com.egm.stellio.shared.model.JsonLdEntity
 import com.egm.stellio.shared.util.JsonLdUtils
 import com.egm.stellio.shared.util.JsonLdUtils.compactTerm
 import com.egm.stellio.shared.util.JsonUtils
+import jakarta.json.JsonObject
 import org.apache.kafka.common.errors.InvalidTopicException
 import org.apache.kafka.common.internals.Topic
 import org.slf4j.LoggerFactory
@@ -59,7 +60,7 @@ class EntityEventService(
 
     fun publishAppendEntityAttributesEvents(
         entityId: URI,
-        jsonLdAttributes: Map<String, Any>,
+        jsonLdAttributes: JsonObject,
         appendResult: UpdateResult,
         updatedEntity: JsonLdEntity,
         contexts: List<String>
@@ -109,7 +110,7 @@ class EntityEventService(
 
     fun publishUpdateEntityAttributesEvents(
         entityId: URI,
-        jsonLdAttributes: Map<String, Any>,
+        jsonLdAttributes: JsonObject,
         updateResult: UpdateResult,
         updatedEntity: JsonLdEntity,
         contexts: List<String>
@@ -142,7 +143,7 @@ class EntityEventService(
 
     fun publishPartialUpdateEntityAttributesEvents(
         entityId: URI,
-        jsonLdAttributes: Map<String, Any>,
+        jsonLdAttributes: JsonObject,
         updatedDetails: List<UpdatedDetails>,
         updatedEntity: JsonLdEntity,
         contexts: List<String>

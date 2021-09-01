@@ -10,6 +10,7 @@ import com.egm.stellio.entity.service.EntityEventService
 import com.egm.stellio.entity.service.EntityOperationService
 import com.egm.stellio.shared.WithMockCustomUser
 import com.egm.stellio.shared.model.*
+import com.egm.stellio.shared.util.AQUAC_COMPOUND_CONTEXT
 import com.egm.stellio.shared.util.JSON_LD_MEDIA_TYPE
 import com.egm.stellio.shared.util.JsonLdUtils
 import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_CORE_CONTEXT
@@ -24,7 +25,6 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient
 import org.springframework.boot.test.autoconfigure.web.reactive.WebFluxTest
 import org.springframework.context.annotation.Import
@@ -40,9 +40,6 @@ import java.net.URI
 @Import(WebSecurityTestConfig::class)
 @WithMockCustomUser(name = "Mock User", username = "mock-user")
 class EntityOperationHandlerTests {
-
-    @Value("\${application.jsonld.aquac_context}")
-    val aquacContext: String? = null
 
     @Autowired
     private lateinit var webClient: WebTestClient
@@ -133,7 +130,7 @@ class EntityOperationHandlerTests {
 
     private val hcmrContext = listOf(
         NGSILD_EGM_CONTEXT,
-        "https://raw.githubusercontent.com/easy-global-market/ngsild-api-data-models/" +
+        "https://gitcdn.link/repo/easy-global-market/ngsild-api-data-models/" +
             "master/aquac/jsonld-contexts/aquac.jsonld",
         NGSILD_CORE_CONTEXT
     )
@@ -673,7 +670,7 @@ class EntityOperationHandlerTests {
             mockkClass(Entity::class, relaxed = true) {
                 every { id } returns entityIdToDelete.captured
                 every { type } returns listOf("Sensor")
-                every { contexts } returns listOf(aquacContext!!)
+                every { contexts } returns listOf(AQUAC_COMPOUND_CONTEXT)
             }
         }
         every { entityEventService.publishEntityEvent(any(), any()) } returns true as java.lang.Boolean
@@ -690,7 +687,7 @@ class EntityOperationHandlerTests {
                 match {
                     it as EntityDeleteEvent
                     it.entityId in deletedEntitiesIds &&
-                        it.contexts == listOf(aquacContext)
+                        it.contexts == listOf(AQUAC_COMPOUND_CONTEXT)
                 },
                 "Sensor"
             )

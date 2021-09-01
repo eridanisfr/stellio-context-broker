@@ -15,10 +15,10 @@ import com.egm.stellio.shared.util.JsonLdUtils.addContextToElement
 import com.egm.stellio.shared.util.JsonLdUtils.addContextsToEntity
 import com.egm.stellio.shared.util.JsonLdUtils.compactTerm
 import com.egm.stellio.shared.util.JsonLdUtils.expandJsonLdKey
-import com.egm.stellio.shared.util.JsonUtils
 import com.egm.stellio.shared.util.JsonUtils.deserializeAs
 import com.egm.stellio.shared.util.JsonUtils.serializeObject
 import com.egm.stellio.shared.util.RECEIVED_NON_PARSEABLE_ENTITY
+import com.egm.stellio.shared.util.deserialize
 import com.egm.stellio.shared.util.toUri
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.ObjectNode
@@ -78,7 +78,8 @@ class EntityEventListenerService(
     private fun handleAttributeDeleteEvent(attributeDeleteEvent: AttributeDeleteEvent) {
         val expandedAttributeName = expandJsonLdKey(attributeDeleteEvent.attributeName, attributeDeleteEvent.contexts)!!
         val compactedJsonLdEntity = addContextsToEntity(
-            JsonUtils.deserializeObject(attributeDeleteEvent.updatedEntity), attributeDeleteEvent.contexts
+            attributeDeleteEvent.updatedEntity.deserialize(),
+            attributeDeleteEvent.contexts
         )
 
         temporalEntityAttributeService.deleteTemporalAttributeReferences(
@@ -106,9 +107,7 @@ class EntityEventListenerService(
             attributeDeleteAllInstancesEvent.attributeName, attributeDeleteAllInstancesEvent.contexts
         )!!
         val compactedJsonLdEntity = addContextsToEntity(
-            JsonUtils.deserializeObject(
-                attributeDeleteAllInstancesEvent.updatedEntity
-            ),
+            attributeDeleteAllInstancesEvent.updatedEntity.deserialize(),
             attributeDeleteAllInstancesEvent.contexts
         )
 
@@ -197,7 +196,7 @@ class EntityEventListenerService(
             logger.info("Ignoring append event for $attributeValuesNode, it has no observedAt information")
             return
         }
-        val compactedJsonLdEntity = addContextsToEntity(JsonUtils.deserializeObject(updatedEntity), contexts)
+        val compactedJsonLdEntity = addContextsToEntity(updatedEntity.deserialize(), contexts)
         val attributeInstancePayload = compactedJsonLdEntity.extractAttributeInstance(
             compactTerm(expandedAttributeName, contexts),
             datasetId
@@ -259,7 +258,7 @@ class EntityEventListenerService(
             }
             is Valid -> {
                 val attributeMetadata = extractedAttributeMetadata.a
-                val compactedJsonLdEntity = addContextsToEntity(JsonUtils.deserializeObject(updatedEntity), contexts)
+                val compactedJsonLdEntity = addContextsToEntity(updatedEntity.deserialize(), contexts)
 
                 val temporalEntityAttribute = TemporalEntityAttribute(
                     entityId = entityId,

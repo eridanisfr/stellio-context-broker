@@ -3,10 +3,14 @@ package com.egm.stellio.search.service
 import com.egm.stellio.search.model.*
 import com.egm.stellio.shared.model.CompactedJsonLdEntity
 import com.egm.stellio.shared.util.*
+import com.egm.stellio.shared.util.JsonLdUtils.toJsonObject
+import com.egm.stellio.shared.util.JsonLdUtils.toJsonString
+import jakarta.json.Json
+import jakarta.json.JsonValue
 import org.springframework.stereotype.Service
 import java.net.URI
 
-typealias SimplifiedTemporalAttribute = Map<String, Any>
+typealias SimplifiedTemporalAttribute = Map<String, JsonValue>
 typealias TemporalEntityAttributeInstancesResult = Map<TemporalEntityAttribute, List<AttributeInstanceResult>>
 
 @Service
@@ -36,8 +40,8 @@ class TemporalEntityService {
         )
 
         return mapOf(
-            "id" to entityId,
-            "type" to JsonLdUtils.compactTerm(attributeAndResultsMap.keys.first().type, contexts)
+            "id" to entityId.toString().toJsonString(),
+            "type" to JsonLdUtils.compactTerm(attributeAndResultsMap.keys.first().type, contexts).toJsonString()
         ).plus(temporalAttributes)
     }
 
@@ -46,23 +50,24 @@ class TemporalEntityService {
         temporalQuery: TemporalQuery,
         contexts: List<String>,
         withTemporalValues: Boolean
-    ): Map<String, Any> {
+    ): Map<String, JsonValue> {
         return if (withTemporalValues || temporalQuery.timeBucket != null) {
             val attributes = buildAttributesSimplifiedRepresentation(attributeAndResultsMap)
             mergeSimplifiedTemporalAttributesOnAttributeName(attributes)
                 .mapKeys { JsonLdUtils.compactTerm(it.key, contexts) }
                 .mapValues {
-                    if (it.value.size == 1) it.value.first()
-                    else it.value
+                    if (it.value.size == 1) it.value.first().toJsonObject()
+                    else Json.createArrayBuilder(it.value).build()
                 }
         } else {
             mergeFullTemporalAttributesOnAttributeName(attributeAndResultsMap)
                 .mapKeys { JsonLdUtils.compactTerm(it.key, contexts) }
                 .mapValues {
-                    it.value.map { attributeInstanceResult ->
+                    val values = it.value.map { attributeInstanceResult ->
                         attributeInstanceResult as FullAttributeInstanceResult
-                        JsonUtils.deserializeObject(attributeInstanceResult.payload)
+                        Json.createReader(attributeInstanceResult.payload.byteInputStream()).readArray()
                     }
+                    Json.createArrayBuilder(values).build()
                 }
         }
     }
@@ -92,7 +97,7 @@ class TemporalEntityService {
                 attributeInstanceResult as SimplifiedAttributeInstanceResult
                 listOf(attributeInstanceResult.value, attributeInstanceResult.observedAt)
             }
-            attributeInstance.toMap()
+            attributeInstance.toMap().toJsonObject()
         }
     }
 

@@ -24,8 +24,11 @@ import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_RELATIONSHIP_HAS_OBJECT
 import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_RELATIONSHIP_TYPE
 import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_TIME_TYPE
 import com.egm.stellio.shared.util.JsonLdUtils.expandJsonLdEntity
+import com.egm.stellio.shared.util.JsonLdUtils.toJsonObject
+import com.egm.stellio.shared.util.JsonLdUtils.toJsonString
 import com.ninjasquad.springmockk.MockkBean
 import io.mockk.*
+import jakarta.json.Json
 import org.hamcrest.core.Is
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
@@ -81,13 +84,6 @@ class EntityHandlerTests {
 
     private val deadFishesType = "https://ontology.eglobalmark.com/aquac#DeadFishes"
     private val fishNumberAttribute = "https://ontology.eglobalmark.com/aquac#fishNumber"
-    private val hcmrContext = listOf(
-        "https://raw.githubusercontent.com/easy-global-market/ngsild-api-data-models/" +
-            "master/shared-jsonld-contexts/egm.jsonld",
-        "https://raw.githubusercontent.com/easy-global-market/ngsild-api-data-models/" +
-            "master/aquac/jsonld-contexts/aquac.jsonld",
-        "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context-v1.3.jsonld"
-    )
 
     @Test
     fun `create entity should return a 201 if JSON-LD payload is correct`() {
@@ -120,7 +116,7 @@ class EntityHandlerTests {
                     it as EntityCreateEvent
                     it.operationType == EventsType.ENTITY_CREATE &&
                         it.entityId == breedingServiceId &&
-                        it.contexts == hcmrContext
+                        it.contexts == listOf(AQUAC_COMPOUND_CONTEXT)
                 },
                 "https://ontology.eglobalmark.com/aquac#BreedingService"
             )
@@ -302,7 +298,7 @@ class EntityHandlerTests {
                     ),
                 "@id" to "urn:ngsi-ld:Beehive:TESTC",
                 "@type" to listOf("Beehive")
-            ),
+            ).toJsonObject(),
             listOf(NGSILD_CORE_CONTEXT)
         )
 
@@ -343,7 +339,7 @@ class EntityHandlerTests {
                         "@value" to "some value 2"
                     )
                 )
-            ),
+            ).toJsonObject(),
             listOf(NGSILD_CORE_CONTEXT)
         )
 
@@ -380,7 +376,7 @@ class EntityHandlerTests {
                         JSONLD_ID to "urn:ngsi-ld:Entity:1234"
                     )
                 )
-            ),
+            ).toJsonObject(),
             listOf(NGSILD_CORE_CONTEXT)
         )
 
@@ -412,7 +408,7 @@ class EntityHandlerTests {
             mapOf(
                 "@id" to "urn:ngsi-ld:Beehive:TESTC",
                 "@type" to listOf("Beehive")
-            ),
+            ).toJsonObject(),
             listOf(NGSILD_CORE_CONTEXT)
         )
 
@@ -442,7 +438,7 @@ class EntityHandlerTests {
             mapOf(
                 "@id" to "urn:ngsi-ld:Beehive:TESTC",
                 "@type" to listOf("Beehive")
-            ),
+            ).toJsonObject(),
             listOf(NGSILD_CORE_CONTEXT)
         )
 
@@ -469,7 +465,7 @@ class EntityHandlerTests {
                     mapOf(
                         "@id" to "urn:ngsi-ld:Beehive:TESTC",
                         "@type" to listOf("Beehive")
-                    ),
+                    ).toJsonObject(),
                     listOf(NGSILD_CORE_CONTEXT)
                 )
             )
@@ -514,7 +510,7 @@ class EntityHandlerTests {
                             ),
                         "@id" to "urn:ngsi-ld:Beehive:TESTC",
                         "@type" to listOf("Beehive")
-                    ),
+                    ).toJsonObject(),
                     listOf(NGSILD_CORE_CONTEXT)
                 )
             )
@@ -550,7 +546,7 @@ class EntityHandlerTests {
             3,
             listOf(
                 JsonLdEntity(
-                    mapOf("@id" to "urn:ngsi-ld:Beehive:TESTC", "@type" to listOf("Beehive")),
+                    mapOf("@id" to "urn:ngsi-ld:Beehive:TESTC", "@type" to listOf("Beehive")).toJsonObject(),
                     listOf(NGSILD_CORE_CONTEXT)
                 )
             )
@@ -707,7 +703,7 @@ class EntityHandlerTests {
                 ),
                 "@id" to "urn:ngsi-ld:Beehive:TESTC",
                 "@type" to listOf("Beehive")
-            ),
+            ).toJsonObject(),
             listOf(NGSILD_CORE_CONTEXT)
         )
 
@@ -752,7 +748,7 @@ class EntityHandlerTests {
                 ),
                 "@id" to "urn:ngsi-ld:Beehive:TESTC",
                 "@type" to listOf("Beehive")
-            ),
+            ).toJsonObject(),
             listOf(NGSILD_CORE_CONTEXT)
         )
 
@@ -794,7 +790,7 @@ class EntityHandlerTests {
                 ),
                 "@id" to "urn:ngsi-ld:Beehive:4567",
                 "@type" to listOf("Beehive")
-            ),
+            ).toJsonObject(),
             listOf(NGSILD_CORE_CONTEXT)
         )
 
@@ -837,7 +833,7 @@ class EntityHandlerTests {
                     ),
                 JSONLD_ID to "urn:ngsi-ld:Beehive:4567",
                 JSONLD_TYPE to listOf("Beehive")
-            ),
+            ).toJsonObject(),
             listOf(NGSILD_CORE_CONTEXT)
         )
 
@@ -869,23 +865,23 @@ class EntityHandlerTests {
                 "https://uri.etsi.org/ngsi-ld/default-context/name" to
                     listOf(
                         mapOf(
-                            JSONLD_TYPE to "https://uri.etsi.org/ngsi-ld/Property",
+                            JSONLD_TYPE to "https://uri.etsi.org/ngsi-ld/Property".toJsonString(),
                             NGSILD_PROPERTY_VALUE to "beehive",
                             NGSILD_DATASET_ID_PROPERTY to mapOf(
                                 JSONLD_ID to "urn:ngsi-ld:Property:english-name"
                             )
                         ),
                         mapOf(
-                            JSONLD_TYPE to "https://uri.etsi.org/ngsi-ld/Property",
+                            JSONLD_TYPE to "https://uri.etsi.org/ngsi-ld/Property".toJsonString(),
                             NGSILD_PROPERTY_VALUE to "ruche",
                             NGSILD_DATASET_ID_PROPERTY to mapOf(
                                 JSONLD_ID to "urn:ngsi-ld:Property:french-name"
                             )
                         )
                     ),
-                JSONLD_ID to "urn:ngsi-ld:Beehive:4567",
-                JSONLD_TYPE to listOf("Beehive")
-            ),
+                JSONLD_ID to Json.createValue("urn:ngsi-ld:Beehive:4567"),
+                JSONLD_TYPE to Json.createArrayBuilder(listOf("Beehive")).build()
+            ).toJsonObject(),
             listOf(NGSILD_CORE_CONTEXT)
         )
 
@@ -933,7 +929,7 @@ class EntityHandlerTests {
                     ),
                 JSONLD_ID to "urn:ngsi-ld:Beehive:4567",
                 JSONLD_TYPE to listOf("Beehive")
-            ),
+            ).toJsonObject(),
             listOf(NGSILD_CORE_CONTEXT)
         )
 
@@ -984,7 +980,7 @@ class EntityHandlerTests {
                     ),
                 JSONLD_ID to "urn:ngsi-ld:Beehive:4567",
                 JSONLD_TYPE to listOf("Beehive")
-            ),
+            ).toJsonObject(),
             listOf(NGSILD_CORE_CONTEXT)
         )
 
@@ -1026,7 +1022,7 @@ class EntityHandlerTests {
                     ),
                 JSONLD_ID to "urn:ngsi-ld:Beehive:4567",
                 JSONLD_TYPE to listOf("Beehive")
-            ),
+            ).toJsonObject(),
             listOf(NGSILD_CORE_CONTEXT)
         )
         val entityId = "urn:ngsi-ld:BeeHive:TESTC".toUri()
@@ -1583,7 +1579,7 @@ class EntityHandlerTests {
             mapOf(
                 "@id" to "urn:ngsi-ld:DeadFishes:019BN",
                 "@type" to listOf(deadFishesType)
-            ),
+            ).toJsonObject(),
             listOf(NGSILD_CORE_CONTEXT)
         )
         every { entityEventService.publishUpdateEntityAttributesEvents(any(), any(), any(), any(), any()) } just Runs

@@ -16,7 +16,6 @@ import com.egm.stellio.shared.util.JSON_LD_CONTENT_TYPE
 import com.egm.stellio.shared.util.JsonLdUtils.addContextsToEntity
 import com.egm.stellio.shared.util.JsonLdUtils.compactTerm
 import com.egm.stellio.shared.util.JsonLdUtils.expandJsonLdFragment
-import com.egm.stellio.shared.util.JsonLdUtils.expandValueAsListOfMap
 import com.egm.stellio.shared.util.JsonUtils.serializeObject
 import com.egm.stellio.shared.util.OptionsParamValue
 import com.egm.stellio.shared.util.buildGetSuccessResponse
@@ -69,9 +68,10 @@ class TemporalEntityHandler(
 
         jsonLdAttributes
             .forEach { attributeEntry ->
-                val attributeInstances = expandValueAsListOfMap(attributeEntry.value)
+                val attributeInstances = attributeEntry.value.asJsonArray()
                 attributeInstances.forEach { attributeInstance ->
-                    val datasetId = attributeInstance.getDatasetId()
+                    val attributeInstanceObject = attributeInstance.asJsonObject()
+                    val datasetId = attributeInstanceObject.getDatasetId()
                     val temporalEntityAttributeUuid = temporalEntityAttributeService.getForEntityAndAttribute(
                         entityId.toUri(),
                         attributeEntry.key,
@@ -82,7 +82,7 @@ class TemporalEntityHandler(
                     attributeInstanceService.addAttributeInstance(
                         temporalEntityAttributeUuid,
                         compactedAttributeName,
-                        attributeInstance,
+                        attributeInstanceObject,
                         contexts
                     ).awaitFirst()
                 }

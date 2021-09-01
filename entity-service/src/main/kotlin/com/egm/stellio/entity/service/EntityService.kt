@@ -8,8 +8,11 @@ import com.egm.stellio.entity.repository.EntitySubjectNode
 import com.egm.stellio.entity.repository.Neo4jRepository
 import com.egm.stellio.entity.repository.PartialEntityRepository
 import com.egm.stellio.shared.model.*
+import com.egm.stellio.shared.util.JsonLdUtils.toJsonObject
 import com.egm.stellio.shared.util.entityNotFoundMessage
 import com.egm.stellio.shared.util.extractShortTypeFromExpanded
+import jakarta.json.Json
+import jakarta.json.JsonValue
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
@@ -160,46 +163,53 @@ class EntityService(
     private fun serializeEntityProperties(
         properties: List<Property>,
         includeSysAttrs: Boolean = false
-    ): Map<String, Any> =
+    ): Map<String, JsonValue> =
         properties
             .map { property ->
                 val serializedProperty = property.serializeCoreProperties(includeSysAttrs)
 
                 property.properties.forEach { innerProperty ->
                     val serializedSubProperty = innerProperty.serializeCoreProperties(includeSysAttrs)
-                    serializedProperty[innerProperty.name] = serializedSubProperty
+                    serializedProperty[innerProperty.name] = serializedSubProperty.toJsonObject()
                 }
 
                 property.relationships.forEach { innerRelationship ->
                     val serializedSubRelationship = innerRelationship.serializeCoreProperties(includeSysAttrs)
-                    serializedProperty[innerRelationship.relationshipType()] = serializedSubRelationship
+                    serializedProperty[innerRelationship.relationshipType()] = serializedSubRelationship.toJsonObject()
                 }
 
                 Pair(property.name, serializedProperty)
             }
             .groupBy({ it.first }, { it.second })
+            .mapValues {
+                Json.createArrayBuilder(it.value).build()
+            }
 
     private fun serializeEntityRelationships(
         relationships: List<Relationship>,
         includeSysAttrs: Boolean = false
-    ): Map<String, Any> =
+    ): Map<String, JsonValue> =
         relationships
             .map { relationship ->
                 val serializedRelationship = relationship.serializeCoreProperties(includeSysAttrs)
 
                 relationship.properties.forEach { innerProperty ->
                     val serializedSubProperty = innerProperty.serializeCoreProperties(includeSysAttrs)
-                    serializedRelationship[innerProperty.name] = serializedSubProperty
+                    serializedRelationship[innerProperty.name] = serializedSubProperty.toJsonObject()
                 }
 
                 relationship.relationships.forEach { innerRelationship ->
                     val serializedSubRelationship = innerRelationship.serializeCoreProperties(includeSysAttrs)
-                    serializedRelationship[innerRelationship.relationshipType()] = serializedSubRelationship
+                    serializedRelationship[innerRelationship.relationshipType()] =
+                        serializedSubRelationship.toJsonObject()
                 }
 
                 Pair(relationship.relationshipType(), serializedRelationship)
             }
             .groupBy({ it.first }, { it.second })
+            .mapValues {
+                Json.createArrayBuilder(it.value).build()
+            }
 
     fun getFullEntitiesById(entitiesIds: List<URI>, includeSysAttrs: Boolean = false): List<JsonLdEntity> =
         entitiesIds
