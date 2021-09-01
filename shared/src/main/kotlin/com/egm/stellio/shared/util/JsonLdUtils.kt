@@ -44,7 +44,7 @@ object JsonLdUtils {
 
     const val NGSILD_CORE_CONTEXT = "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context-v1.3.jsonld"
     const val EGM_BASE_CONTEXT_URL =
-        "https://gitcdn.link/repo/easy-global-market/ngsild-api-data-models/master"
+        "https://gitcdn.link/repo/easy-global-market/ngsild-api-data-models/feature/357-prepare-core-context-upgrade-to-1_3"
     const val NGSILD_EGM_CONTEXT = "$EGM_BASE_CONTEXT_URL/shared-jsonld-contexts/egm.jsonld"
 
     enum class NgsiLdAttributeType(val value: String) {
