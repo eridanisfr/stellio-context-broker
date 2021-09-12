@@ -548,3 +548,10 @@ fun String.extractShortTypeFromExpanded(): String =
 
 fun JsonObject.typeOfAttribute(): NgsiLdAttributeType? =
     NgsiLdAttributeType.forString((this["type"] as JsonString).string)
+
+// expanded values are typically wrapped in an array of one element
+fun JsonValue.extractJsonObject(): JsonObject =
+    if (this is JsonArray)
+        this.asJsonArray().getJsonObject(0)
+    else
+        this.asJsonObject()

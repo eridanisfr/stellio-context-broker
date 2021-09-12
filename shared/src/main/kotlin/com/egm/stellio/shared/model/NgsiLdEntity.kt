@@ -23,6 +23,7 @@ import com.egm.stellio.shared.util.JsonLdUtils.getPropertyValueFromObject
 import com.egm.stellio.shared.util.JsonLdUtils.getPropertyValueAsDateTime
 import com.egm.stellio.shared.util.JsonLdUtils.getPropertyValueAsString
 import com.egm.stellio.shared.util.extractShortTypeFromExpanded
+import com.egm.stellio.shared.util.extractJsonObject
 import com.egm.stellio.shared.util.toUri
 import jakarta.json.Json
 import jakarta.json.JsonArray
@@ -110,7 +111,7 @@ class NgsiLdProperty private constructor(
             checkInstancesAreOfSameType(name, instances, NGSILD_PROPERTY_TYPE)
 
             val ngsiLdPropertyInstances = instances.map { instance ->
-                NgsiLdPropertyInstance(name, instance.asJsonObject())
+                NgsiLdPropertyInstance(name, instance.extractJsonObject())
             }
 
             checkAttributeDefaultInstance(name, ngsiLdPropertyInstances)
@@ -135,7 +136,7 @@ class NgsiLdRelationship private constructor(
             checkInstancesAreOfSameType(name, instances, NGSILD_RELATIONSHIP_TYPE)
 
             val ngsiLdRelationshipInstances = instances.map { instance ->
-                NgsiLdRelationshipInstance(name, instance.asJsonObject())
+                NgsiLdRelationshipInstance(name, instance.extractJsonObject())
             }
 
             checkAttributeDefaultInstance(name, ngsiLdRelationshipInstances)
@@ -160,7 +161,7 @@ class NgsiLdGeoProperty private constructor(
             checkInstancesAreOfSameType(name, instances, NGSILD_GEOPROPERTY_TYPE)
 
             val ngsiLdGeoPropertyInstances = instances.map { instance ->
-                NgsiLdGeoPropertyInstance(instance.asJsonObject())
+                NgsiLdGeoPropertyInstance(instance.extractJsonObject())
             }
 
             checkAttributeDefaultInstance(name, ngsiLdGeoPropertyInstances)
@@ -372,7 +373,7 @@ private fun getNonCoreAttributes(parsedKeys: JsonObject, keysToFilter: List<Stri
 
 // TODO to be refactored with validation
 fun checkInstancesAreOfSameType(name: String, values: JsonArray, type: AttributeType) {
-    if (!values.all { isAttributeOfType(it.asJsonObject(), type) })
+    if (!values.all { isAttributeOfType(it.extractJsonObject(), type) })
         throw BadRequestDataException("Attribute $name instances must have the same type")
 }
 

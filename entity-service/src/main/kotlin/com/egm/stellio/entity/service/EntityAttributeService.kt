@@ -22,6 +22,7 @@ import com.egm.stellio.shared.model.getDatasetId
 import com.egm.stellio.shared.model.isAttributeOfType
 import com.egm.stellio.shared.util.JsonLdUtils
 import com.egm.stellio.shared.util.JsonLdUtils.expandJsonLdKey
+import com.egm.stellio.shared.util.extractJsonObject
 import jakarta.json.Json
 import jakarta.json.JsonObject
 import org.slf4j.LoggerFactory
@@ -178,7 +179,7 @@ class EntityAttributeService(
                 !NGSILD_PROPERTIES_CORE_MEMBERS.contains(it)
         }.map {
             val attributeOfAttributeName = it.key
-            val attributeOfAttributeObject = it.value.asJsonObject()
+            val attributeOfAttributeObject = it.value.extractJsonObject()
             when {
                 neo4jRepository.hasRelationshipInstance(
                     AttributeSubjectNode(attribute.id()),
