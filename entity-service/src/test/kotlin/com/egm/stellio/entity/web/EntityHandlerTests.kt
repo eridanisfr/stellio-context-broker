@@ -1679,7 +1679,7 @@ class EntityHandlerTests {
                 {
                     "type": "https://uri.etsi.org/ngsi-ld/errors/LdContextNotAvailable",
                     "title": "A remote JSON-LD @context referenced in a request cannot be retrieved by the NGSI-LD Broker and expansion or compaction cannot be performed",
-                    "detail": "Unable to load remote context (cause was: com.github.jsonldjava.core.JsonLdError: loading remote context failed: http://easyglobalmarket.com/contexts/diat.jsonld)"
+                    "detail": "Unable to load remote context (cause was: There was a problem encountered loading a remote context [code=LOADING_REMOTE_CONTEXT_FAILED].)"
                 }
                 """.trimIndent()
             )

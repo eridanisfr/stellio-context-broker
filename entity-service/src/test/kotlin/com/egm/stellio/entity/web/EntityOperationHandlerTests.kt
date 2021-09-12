@@ -11,6 +11,7 @@ import com.egm.stellio.entity.service.EntityOperationService
 import com.egm.stellio.shared.WithMockCustomUser
 import com.egm.stellio.shared.model.*
 import com.egm.stellio.shared.util.AQUAC_COMPOUND_CONTEXT
+import com.egm.stellio.shared.util.AQUAC_CONTEXT
 import com.egm.stellio.shared.util.JSON_LD_MEDIA_TYPE
 import com.egm.stellio.shared.util.JsonLdUtils
 import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_CORE_CONTEXT
@@ -130,8 +131,7 @@ class EntityOperationHandlerTests {
 
     private val hcmrContext = listOf(
         NGSILD_EGM_CONTEXT,
-        "https://gitcdn.link/repo/easy-global-market/ngsild-api-data-models/" +
-            "master/aquac/jsonld-contexts/aquac.jsonld",
+        AQUAC_CONTEXT,
         NGSILD_CORE_CONTEXT
     )
 
