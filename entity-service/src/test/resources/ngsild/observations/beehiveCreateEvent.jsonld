@@ -3,6 +3,6 @@
    "entityId":"urn:ngsi-ld:BeeHive:TESTC",
    "operationPayload":"{\"id\":\"urn:ngsi-ld:BeeHive:TESTC\",\"type\":\"BeeHive\",\"belongs\":{\"type\":\"Relationship\",\"object\":\"urn:ngsi-ld:Apiary:XYZ01\"}}",
    "contexts":[
-      "https://raw.githubusercontent.com/easy-global-market/ngsild-api-data-models/master/apic/jsonld-contexts/apic-compound.jsonld"
+      "https://raw.githubusercontent.com/easy-global-market/ngsild-api-data-models/feature/357-prepare-core-context-upgrade-to-1_3/apic/jsonld-contexts/apic-compound.jsonld"
    ]
 }

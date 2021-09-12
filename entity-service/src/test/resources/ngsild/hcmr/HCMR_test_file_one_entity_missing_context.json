@@ -3,8 +3,8 @@
     "id": "urn:ngsi-ld:Sensor:HCMR-AQUABOX1temperature",
     "type": "Sensor",
     "@context": [
-      "https://raw.githubusercontent.com/easy-global-market/ngsild-api-data-models/master/shared-jsonld-contexts/egm.jsonld",
-      "https://raw.githubusercontent.com/easy-global-market/ngsild-api-data-models/master/aquac/jsonld-contexts/aquac.jsonld",
+      "https://raw.githubusercontent.com/easy-global-market/ngsild-api-data-models/feature/357-prepare-core-context-upgrade-to-1_3/shared-jsonld-contexts/egm.jsonld",
+      "https://raw.githubusercontent.com/easy-global-market/ngsild-api-data-models/feature/357-prepare-core-context-upgrade-to-1_3/aquac/jsonld-contexts/aquac.jsonld",
       "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context-v1.3.jsonld"
     ]
   },
@@ -16,8 +16,8 @@
     "id": "urn:ngsi-ld:Device:HCMR-AQUABOX1",
     "type": "Device",
     "@context": [
-      "https://raw.githubusercontent.com/easy-global-market/ngsild-api-data-models/master/shared-jsonld-contexts/egm.jsonld",
-      "https://raw.githubusercontent.com/easy-global-market/ngsild-api-data-models/master/aquac/jsonld-contexts/aquac.jsonld",
+      "https://raw.githubusercontent.com/easy-global-market/ngsild-api-data-models/feature/357-prepare-core-context-upgrade-to-1_3/shared-jsonld-contexts/egm.jsonld",
+      "https://raw.githubusercontent.com/easy-global-market/ngsild-api-data-models/feature/357-prepare-core-context-upgrade-to-1_3/aquac/jsonld-contexts/aquac.jsonld",
       "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context-v1.3.jsonld"
     ]
   }

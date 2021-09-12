@@ -6,6 +6,6 @@
    "operationPayload":"{ \"value\":76, \"unitCode\": \"CEL\", \"observedAt\": \"2019-10-26T22:35:52.98601Z\" }",
    "updatedEntity":"",
    "contexts":[
-      "https://raw.githubusercontent.com/easy-global-market/ngsild-api-data-models/master/apic/jsonld-contexts/apic-compound.jsonld"
+      "https://raw.githubusercontent.com/easy-global-market/ngsild-api-data-models/feature/357-prepare-core-context-upgrade-to-1_3/apic/jsonld-contexts/apic-compound.jsonld"
    ]
 }

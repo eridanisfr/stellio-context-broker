@@ -86,8 +86,8 @@
 	 }
   },
    "@context": [
-      "https://raw.githubusercontent.com/easy-global-market/ngsild-api-data-models/master/shared-jsonld-contexts/egm.jsonld",
-      "https://raw.githubusercontent.com/easy-global-market/ngsild-api-data-models/master/apic/jsonld-contexts/apic.jsonld",
+      "https://raw.githubusercontent.com/easy-global-market/ngsild-api-data-models/feature/357-prepare-core-context-upgrade-to-1_3/shared-jsonld-contexts/egm.jsonld",
+      "https://raw.githubusercontent.com/easy-global-market/ngsild-api-data-models/feature/357-prepare-core-context-upgrade-to-1_3/apic/jsonld-contexts/apic.jsonld",
       "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context-v1.3.jsonld"
    ]
 }
