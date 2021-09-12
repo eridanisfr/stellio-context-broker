@@ -10,6 +10,8 @@ import com.apicatalog.jsonld.JsonLdErrorCode
 import com.apicatalog.jsonld.JsonLdOptions
 import com.apicatalog.jsonld.context.cache.LruCache
 import com.apicatalog.jsonld.document.JsonDocument
+import com.apicatalog.jsonld.http.DefaultHttpClient
+import com.apicatalog.jsonld.loader.HttpLoader
 import com.egm.stellio.shared.model.BadRequestDataException
 import com.egm.stellio.shared.model.CompactedJsonLdEntity
 import com.egm.stellio.shared.model.GeoPropertyType
@@ -44,7 +46,7 @@ object JsonLdUtils {
 
     const val NGSILD_CORE_CONTEXT = "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context-v1.3.jsonld"
     const val EGM_BASE_CONTEXT_URL =
-        "https://gitcdn.link/repo/easy-global-market/ngsild-api-data-models/feature/357-prepare-core-context-upgrade-to-1_3"
+        "https://raw.githubusercontent.com/easy-global-market/ngsild-api-data-models/feature/357-prepare-core-context-upgrade-to-1_3/"
     const val NGSILD_EGM_CONTEXT = "$EGM_BASE_CONTEXT_URL/shared-jsonld-contexts/egm.jsonld"
 
     enum class NgsiLdAttributeType(val value: String) {
@@ -95,9 +97,16 @@ object JsonLdUtils {
 
     val logger: Logger = LoggerFactory.getLogger(javaClass)
 
+    // TODO our JSON-LD contexts are hosted on GH where the content type is set to text/plain
+    //  so allow any content type (by default the lib only allows JSON or JSON-LD)
+    private val httpLoader = HttpLoader(DefaultHttpClient.defaultInstance()).apply {
+        setFallbackContentType(com.apicatalog.jsonld.http.media.MediaType.ANY)
+    }
+
     // TODO see if this can be improved, for instance by preloading the core context?
     private val jsonLdOptions = JsonLdOptions().apply {
         this.contextCache = LruCache(1024)
+        this.documentLoader = httpLoader
     }
 
     fun expandJsonLdEntity(input: String, contexts: List<String>): JsonLdEntity {
@@ -157,7 +166,9 @@ object JsonLdUtils {
                     .context(createContextDocument(contexts, addCoreContextIfMissing))
                     .get()
             else
-                JsonLd.expand(documentFragment).get()
+                JsonLd.expand(documentFragment)
+                    .options(jsonLdOptions)
+                    .get()
         } catch (e: JsonLdError) {
             if (e.code == JsonLdErrorCode.LOADING_REMOTE_CONTEXT_FAILED)
                 throw LdContextNotAvailableException("Unable to load remote context (cause was: ${e.message ?: e.code})")
