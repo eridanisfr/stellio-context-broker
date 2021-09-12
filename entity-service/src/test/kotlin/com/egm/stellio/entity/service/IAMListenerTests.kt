@@ -2,6 +2,7 @@ package com.egm.stellio.entity.service
 
 import com.egm.stellio.shared.model.NgsiLdProperty
 import com.egm.stellio.shared.model.NgsiLdRelationship
+import com.egm.stellio.shared.util.JsonLdUtils.toJsonString
 import com.egm.stellio.shared.util.loadSampleData
 import com.egm.stellio.shared.util.toUri
 import com.ninjasquad.springmockk.MockkBean
@@ -184,7 +185,7 @@ class IAMListenerTests {
                         (it[0] as NgsiLdProperty).instances.size == 1 &&
                         (it[0] as NgsiLdProperty).instances[0].value is List<*> &&
                         ((it[0] as NgsiLdProperty).instances[0].value as List<*>)
-                            .containsAll(setOf("stellio-admin", "stellio-creator"))
+                            .containsAll(setOf("stellio-admin".toJsonString(), "stellio-creator".toJsonString()))
                 },
                 false
             )

@@ -417,7 +417,7 @@ class EntityServiceTests {
             mapOf(
                 NGSILD_PROPERTY_VALUE to listOf(
                     mapOf(
-                        "@type" to listOf(NGSILD_PROPERTY_TYPE),
+                        "@type" to listOf(NGSILD_PROPERTY_TYPE.uri),
                         "@value" to 250
                     )
                 ),
