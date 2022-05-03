@@ -251,7 +251,7 @@ class EntityOperationHandlerTests {
         val jsonLdFile = ClassPathResource("/ngsild/hcmr/HCMR_test_file.json")
         val capturedExpandedEntities = slot<List<NgsiLdEntity>>()
         val capturedEntitiesIds = mutableListOf<URI>()
-        val capturedEntityType = slot<String>()
+        val capturedEntityTypes = slot<List<String>>()
 
         every {
             entityOperationService.splitEntitiesByExistence(capture(capturedExpandedEntities))
@@ -264,7 +264,7 @@ class EntityOperationHandlerTests {
         every { authorizationService.createAdminLinks(any(), eq(sub)) } just Runs
         every {
             entityEventService.publishEntityCreateEvent(
-                any(), capture(capturedEntitiesIds), capture(capturedEntityType), any()
+                any(), capture(capturedEntitiesIds), capture(capturedEntityTypes), any()
             )
         } just Runs
 
@@ -284,7 +284,7 @@ class EntityOperationHandlerTests {
             entityEventService.publishEntityCreateEvent(any(), any(), any(), any())
         }
         capturedEntitiesIds.forEach { assertTrue(it in allEntitiesUris) }
-        assertTrue(capturedEntityType.captured in listOf(sensorType, deviceType))
+        assertTrue(capturedEntityTypes.captured[0] in listOf(sensorType, deviceType))
         confirmVerified()
     }
 
@@ -293,7 +293,7 @@ class EntityOperationHandlerTests {
         val jsonLdFile = ClassPathResource("/ngsild/hcmr/HCMR_test_file.json")
         val createdEntitiesIds = arrayListOf(dissolvedOxygenSensorUri, deviceUri)
         val capturedEntitiesIds = mutableListOf<URI>()
-        val capturedEntityType = slot<String>()
+        val capturedEntityTypes = slot<List<String>>()
 
         every {
             entityOperationService.splitEntitiesByExistence(any())
@@ -311,7 +311,7 @@ class EntityOperationHandlerTests {
         every { authorizationService.createAdminLinks(any(), eq(sub)) } just Runs
         every {
             entityEventService.publishEntityCreateEvent(
-                any(), capture(capturedEntitiesIds), capture(capturedEntityType), any()
+                any(), capture(capturedEntitiesIds), capture(capturedEntityTypes), any()
             )
         } just Runs
 
@@ -340,7 +340,7 @@ class EntityOperationHandlerTests {
         verify { authorizationService.createAdminLinks(createdEntitiesIds, sub) }
         verify(timeout = 1000, exactly = 2) { entityEventService.publishEntityCreateEvent(any(), any(), any(), any()) }
         capturedEntitiesIds.forEach { assertTrue(it in createdEntitiesIds) }
-        assertTrue(capturedEntityType.captured in listOf(sensorType, deviceType))
+        assertTrue(capturedEntityTypes.captured[0] in listOf(sensorType, deviceType))
         confirmVerified()
     }
 
@@ -444,7 +444,7 @@ class EntityOperationHandlerTests {
             entityEventService.publishEntityCreateEvent(
                 eq(sub.value),
                 match { it in createdEntitiesIds },
-                eq(sensorType),
+                eq(listOf(sensorType)),
                 eq(hcmrContext)
             )
         }
@@ -569,7 +569,7 @@ class EntityOperationHandlerTests {
             entityEventService.publishEntityReplaceEvent(
                 eq(sub.value),
                 match { it in entitiesIds },
-                eq(sensorType),
+                eq(listOf(sensorType)),
                 eq(hcmrContext)
             )
         }
@@ -661,7 +661,7 @@ class EntityOperationHandlerTests {
             entityEventService.publishEntityReplaceEvent(
                 eq(sub.value),
                 eq(temperatureSensorUri),
-                eq(sensorType),
+                eq(listOf(sensorType)),
                 eq(hcmrContext)
             )
         }
@@ -710,7 +710,7 @@ class EntityOperationHandlerTests {
         every { entityOperationService.getEntityCoreProperties(capture(entityIdToDelete)) } answers {
             mockkClass(Entity::class, relaxed = true) {
                 every { id } returns entityIdToDelete.captured
-                every { type } returns listOf(sensorType)
+                every { types } returns listOf(sensorType)
                 every { contexts } returns listOf(aquacContext!!)
             }
         }
@@ -754,17 +754,17 @@ class EntityOperationHandlerTests {
         every { entityOperationService.getEntityCoreProperties(any()) } answers {
             mockkClass(Entity::class, relaxed = true) {
                 every { id } returns dissolvedOxygenSensorUri
-                every { type } returns listOf(sensorType)
+                every { types } returns listOf(sensorType)
             }
         } andThenAnswer {
             mockkClass(Entity::class, relaxed = true) {
                 every { id } returns temperatureSensorUri
-                every { type } returns listOf(sensorType)
+                every { types } returns listOf(sensorType)
             }
         } andThenAnswer {
             mockkClass(Entity::class, relaxed = true) {
                 every { id } returns deviceUri
-                every { type } returns listOf(deviceType)
+                every { types } returns listOf(deviceType)
             }
         }
         every {
