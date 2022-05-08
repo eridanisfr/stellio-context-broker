@@ -726,7 +726,7 @@ class EntityOperationHandlerTests {
             entityEventService.publishEntityDeleteEvent(
                 eq(sub.value),
                 match { it in allEntitiesUris },
-                eq(sensorType),
+                eq(listOf(sensorType)),
                 eq(listOf(aquacContext!!))
             )
         }
