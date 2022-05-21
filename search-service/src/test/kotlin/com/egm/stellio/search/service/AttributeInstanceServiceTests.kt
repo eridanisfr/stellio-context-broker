@@ -51,7 +51,7 @@ class AttributeInstanceServiceTests : WithTimescaleContainer {
     fun createTemporalEntityAttribute() {
         temporalEntityAttribute = TemporalEntityAttribute(
             entityId = entityId,
-            type = BEEHIVE_COMPACT_TYPE,
+            types = listOf(BEEHIVE_TYPE),
             attributeName = INCOMING_COMPACT_PROPERTY,
             attributeValueType = TemporalEntityAttribute.AttributeValueType.MEASURE
         )
@@ -206,7 +206,7 @@ class AttributeInstanceServiceTests : WithTimescaleContainer {
     fun `it should retrieve instances of a temporal entity attribute whose value type is Any`() {
         val temporalEntityAttribute2 = TemporalEntityAttribute(
             entityId = entityId,
-            type = BEEHIVE_COMPACT_TYPE,
+            types = listOf(BEEHIVE_TYPE),
             attributeName = "propWithStringValue",
             attributeValueType = TemporalEntityAttribute.AttributeValueType.ANY
         )
@@ -400,7 +400,7 @@ class AttributeInstanceServiceTests : WithTimescaleContainer {
     fun `it should only retrieve the temporal evolution of the provided temporal entity attribute`() {
         val temporalEntityAttribute2 = TemporalEntityAttribute(
             entityId = entityId,
-            type = BEEHIVE_COMPACT_TYPE,
+            types = listOf(BEEHIVE_TYPE),
             attributeName = OUTGOING_COMPACT_PROPERTY,
             attributeValueType = TemporalEntityAttribute.AttributeValueType.MEASURE
         )

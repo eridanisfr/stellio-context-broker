@@ -34,10 +34,10 @@ data class Subscription(
 ) {
     fun expandTypes(context: List<String>) {
         this.entities.forEach {
-            it.type = JsonLdUtils.expandJsonLdTerm(it.type, context)!!
+            it.type = JsonLdUtils.expandJsonLdTerm(it.type, context)
         }
         this.notification.attributes = this.notification.attributes?.map {
-            JsonLdUtils.expandJsonLdTerm(it, context)!!
+            JsonLdUtils.expandJsonLdTerm(it, context)
         }
     }
 
