@@ -3,6 +3,7 @@ package com.egm.stellio.search.service
 import arrow.core.left
 import arrow.core.right
 import com.egm.stellio.search.authorization.AuthorizationService
+import com.egm.stellio.search.model.EMPTY_UPDATE_RESULT
 import com.egm.stellio.search.model.NotUpdatedDetails
 import com.egm.stellio.search.model.UpdateResult
 import com.egm.stellio.search.web.BatchEntityError
@@ -37,7 +38,7 @@ class EntityOperationServiceTests {
     private lateinit var entityPayloadService: EntityPayloadService
 
     @MockkBean(relaxed = true)
-    private lateinit var entityAttributeCleanerService: EntityAttributeCleanerService
+    private lateinit var temporalEntityAttributeService: TemporalEntityAttributeService
 
     @MockkBean
     private lateinit var authorizationService: AuthorizationService
@@ -144,11 +145,8 @@ class EntityOperationServiceTests {
     @Test
     fun `it should ask to update attributes of entities`() = runTest {
         coEvery {
-            entityPayloadService.updateTypes(any(), any(), any())
-        } returns UpdateResult(emptyList(), emptyList()).right()
-        coEvery {
-            entityPayloadService.appendAttributes(any(), any(), any(), any(), any())
-        } returns UpdateResult(emptyList(), emptyList()).right()
+            entityPayloadService.appendAttributes(any(), any(), any(), any())
+        } returns EMPTY_UPDATE_RESULT.right()
 
         val batchOperationResult = entityOperationService.update(
             listOf(Pair(firstEntity, firstJsonLdEntity), Pair(secondEntity, secondJsonLdEntity)),
@@ -161,25 +159,21 @@ class EntityOperationServiceTests {
             batchOperationResult.getSuccessfulEntitiesIds()
         )
 
-        coVerify(exactly = 2) { entityPayloadService.updateTypes(any(), any(), false) }
         coVerify {
-            entityPayloadService.appendAttributes(eq(firstEntityURI), any(), any(), false, sub)
+            entityPayloadService.appendAttributes(eq(firstEntityURI), any(), false, sub)
         }
         coVerify {
-            entityPayloadService.appendAttributes(eq(secondEntityURI), any(), any(), false, sub)
+            entityPayloadService.appendAttributes(eq(secondEntityURI), any(), false, sub)
         }
     }
 
     @Test
     fun `it should count as error an update which raises a BadRequestDataException`() = runTest {
         coEvery {
-            entityPayloadService.updateTypes(any(), any(), any())
-        } returns UpdateResult(emptyList(), emptyList()).right()
+            entityPayloadService.appendAttributes(firstEntityURI, any(), any(), any())
+        } returns EMPTY_UPDATE_RESULT.right()
         coEvery {
-            entityPayloadService.appendAttributes(firstEntityURI, any(), any(), any(), any())
-        } returns UpdateResult(emptyList(), emptyList()).right()
-        coEvery {
-            entityPayloadService.appendAttributes(secondEntityURI, any(), any(), any(), any())
+            entityPayloadService.appendAttributes(secondEntityURI, any(), any(), any())
         } returns BadRequestDataException("error").left()
 
         val batchOperationResult =
@@ -190,7 +184,7 @@ class EntityOperationServiceTests {
             )
 
         assertEquals(
-            listOf(BatchEntitySuccess(firstEntityURI, updateResult = UpdateResult(emptyList(), emptyList()))),
+            listOf(BatchEntitySuccess(firstEntityURI, updateResult = EMPTY_UPDATE_RESULT)),
             batchOperationResult.success
         )
         assertEquals(
@@ -209,13 +203,10 @@ class EntityOperationServiceTests {
             )
         )
         coEvery {
-            entityPayloadService.updateTypes(any(), any(), any())
-        } returns UpdateResult(emptyList(), emptyList()).right()
+            entityPayloadService.appendAttributes(firstEntityURI, any(), any(), any())
+        } returns EMPTY_UPDATE_RESULT.right()
         coEvery {
-            entityPayloadService.appendAttributes(firstEntityURI, any(), any(), any(), any())
-        } returns UpdateResult(emptyList(), emptyList()).right()
-        coEvery {
-            entityPayloadService.appendAttributes(secondEntityURI, any(), any(), any(), any())
+            entityPayloadService.appendAttributes(secondEntityURI, any(), any(), any())
         } returns updateResult.right()
 
         val batchOperationResult = entityOperationService.update(
@@ -225,7 +216,7 @@ class EntityOperationServiceTests {
         )
 
         assertEquals(
-            listOf(BatchEntitySuccess(firstEntityURI, UpdateResult(emptyList(), emptyList()))),
+            listOf(BatchEntitySuccess(firstEntityURI, EMPTY_UPDATE_RESULT)),
             batchOperationResult.success
         )
         assertEquals(
@@ -242,11 +233,8 @@ class EntityOperationServiceTests {
     @Test
     fun `it should ask to replace entities`() = runTest {
         coEvery {
-            entityPayloadService.updateTypes(any(), any(), any())
-        } returns UpdateResult(emptyList(), emptyList()).right()
-        coEvery {
-            entityPayloadService.appendAttributes(any(), any(), any(), any(), any())
-        } returns UpdateResult(emptyList(), emptyList()).right()
+            entityPayloadService.appendAttributes(any(), any(), any(), any())
+        } returns EMPTY_UPDATE_RESULT.right()
 
         val batchOperationResult = entityOperationService.replace(
             listOf(Pair(firstEntity, firstJsonLdEntity), Pair(secondEntity, secondJsonLdEntity)),
@@ -259,28 +247,24 @@ class EntityOperationServiceTests {
         )
         assertTrue(batchOperationResult.errors.isEmpty())
 
-        coVerify { entityAttributeCleanerService.deleteEntityAttributes(firstEntityURI) }
-        coVerify { entityAttributeCleanerService.deleteEntityAttributes(secondEntityURI) }
+        coVerify { temporalEntityAttributeService.deleteTemporalAttributesOfEntity(firstEntityURI) }
+        coVerify { temporalEntityAttributeService.deleteTemporalAttributesOfEntity(secondEntityURI) }
 
-        coVerify(exactly = 2) { entityPayloadService.updateTypes(any(), any(), false) }
         coVerify {
-            entityPayloadService.appendAttributes(eq(firstEntityURI), any(), any(), false, sub)
+            entityPayloadService.appendAttributes(eq(firstEntityURI), any(), false, sub)
         }
         coVerify {
-            entityPayloadService.appendAttributes(eq(secondEntityURI), any(), any(), false, sub)
+            entityPayloadService.appendAttributes(eq(secondEntityURI), any(), false, sub)
         }
     }
 
     @Test
     fun `it should count as error an replace which raises a BadRequestDataException`() = runTest {
         coEvery {
-            entityPayloadService.updateTypes(any(), any(), any())
-        } returns UpdateResult(emptyList(), emptyList()).right()
+            entityPayloadService.appendAttributes(firstEntityURI, any(), any(), any())
+        } returns EMPTY_UPDATE_RESULT.right()
         coEvery {
-            entityPayloadService.appendAttributes(firstEntityURI, any(), any(), any(), any())
-        } returns UpdateResult(emptyList(), emptyList()).right()
-        coEvery {
-            entityPayloadService.appendAttributes(secondEntityURI, any(), any(), any(), any())
+            entityPayloadService.appendAttributes(secondEntityURI, any(), any(), any())
         } returns BadRequestDataException("error").left()
 
         val batchOperationResult = entityOperationService.replace(
@@ -298,13 +282,10 @@ class EntityOperationServiceTests {
     @Test
     fun `it should count as error not replaced entities in entities`() = runTest {
         coEvery {
-            entityPayloadService.updateTypes(any(), any(), any())
-        } returns UpdateResult(emptyList(), emptyList()).right()
+            entityPayloadService.appendAttributes(firstEntityURI, any(), any(), any())
+        } returns EMPTY_UPDATE_RESULT.right()
         coEvery {
-            entityPayloadService.appendAttributes(firstEntityURI, any(), any(), any(), any())
-        } returns UpdateResult(emptyList(), emptyList()).right()
-        coEvery {
-            entityPayloadService.appendAttributes(secondEntityURI, any(), any(), any(), any())
+            entityPayloadService.appendAttributes(secondEntityURI, any(), any(), any())
         } returns UpdateResult(
             emptyList(),
             listOf(
@@ -332,7 +313,7 @@ class EntityOperationServiceTests {
 
     @Test
     fun `it should return the list of deleted entity ids when deletion is successful`() = runTest {
-        coEvery { entityPayloadService.deleteEntityPayload(any()) } returns Unit.right()
+        coEvery { entityPayloadService.deleteEntity(any()) } returns Unit.right()
         coEvery { authorizationService.removeRightsOnEntity(any()) } returns Unit.right()
 
         val batchOperationResult = entityOperationService.delete(setOf(firstEntityURI, secondEntityURI))
@@ -344,8 +325,8 @@ class EntityOperationServiceTests {
         assertEquals(emptyList<BatchEntityError>(), batchOperationResult.errors)
 
         coVerify {
-            entityPayloadService.deleteEntityPayload(firstEntityURI)
-            entityPayloadService.deleteEntityPayload(secondEntityURI)
+            entityPayloadService.deleteEntity(firstEntityURI)
+            entityPayloadService.deleteEntity(secondEntityURI)
             authorizationService.removeRightsOnEntity(firstEntityURI)
             authorizationService.removeRightsOnEntity(secondEntityURI)
         }
@@ -354,9 +335,9 @@ class EntityOperationServiceTests {
     @Test
     fun `it should return the list of deleted entity ids and in errors when deletion is partially successful`() =
         runTest {
-            coEvery { entityPayloadService.deleteEntityPayload(firstEntityURI) } returns Unit.right()
+            coEvery { entityPayloadService.deleteEntity(firstEntityURI) } returns Unit.right()
             coEvery {
-                entityPayloadService.deleteEntityPayload(secondEntityURI)
+                entityPayloadService.deleteEntity(secondEntityURI)
             } returns InternalErrorException("Something went wrong during deletion").left()
             coEvery { authorizationService.removeRightsOnEntity(any()) } returns Unit.right()
 
@@ -382,7 +363,7 @@ class EntityOperationServiceTests {
         val deleteEntityErrorMessage = "Something went wrong with deletion request"
 
         coEvery {
-            entityPayloadService.deleteEntityPayload(any())
+            entityPayloadService.deleteEntity(any())
         } returns InternalErrorException(deleteEntityErrorMessage).left()
 
         val batchOperationResult = entityOperationService.delete(setOf(firstEntityURI, secondEntityURI))
@@ -402,7 +383,7 @@ class EntityOperationServiceTests {
             batchOperationResult.errors
         )
 
-        coVerify { entityPayloadService.deleteEntityPayload(firstEntityURI) }
-        coVerify { entityPayloadService.deleteEntityPayload(secondEntityURI) }
+        coVerify { entityPayloadService.deleteEntity(firstEntityURI) }
+        coVerify { entityPayloadService.deleteEntity(secondEntityURI) }
     }
 }

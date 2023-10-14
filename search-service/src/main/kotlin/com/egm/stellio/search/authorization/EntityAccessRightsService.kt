@@ -1,11 +1,11 @@
 package com.egm.stellio.search.authorization
 
 import arrow.core.*
-import arrow.core.continuations.either
+import arrow.core.raise.either
 import com.egm.stellio.search.authorization.EntityAccessRights.SubjectRightInfo
-import com.egm.stellio.search.config.ApplicationProperties
 import com.egm.stellio.search.service.EntityPayloadService
 import com.egm.stellio.search.util.*
+import com.egm.stellio.shared.config.ApplicationProperties
 import com.egm.stellio.shared.model.APIException
 import com.egm.stellio.shared.model.AccessDeniedException
 import com.egm.stellio.shared.model.ResourceNotFoundException
@@ -21,7 +21,7 @@ import com.egm.stellio.shared.util.AuthContextModel.GROUP_ENTITY_PREFIX
 import com.egm.stellio.shared.util.AuthContextModel.SpecificAccessPolicy
 import com.egm.stellio.shared.util.AuthContextModel.USER_COMPACT_TYPE
 import com.egm.stellio.shared.util.AuthContextModel.USER_ENTITY_PREFIX
-import com.egm.stellio.shared.util.JsonLdUtils.JSONLD_VALUE
+import com.egm.stellio.shared.util.JsonLdUtils.JSONLD_VALUE_TERM
 import com.egm.stellio.shared.util.JsonUtils.deserializeAsMap
 import org.springframework.r2dbc.core.DatabaseClient
 import org.springframework.stereotype.Service
@@ -271,7 +271,7 @@ class EntityAccessRightsService(
             .groupBy { toUri(it["entity_id"]) }
             .mapValues {
                 it.value
-                    .groupBy { AccessRight.forAttributeName(it["access_right"] as String).orNull()!! }
+                    .groupBy { AccessRight.forAttributeName(it["access_right"] as String).getOrNull()!! }
                     .mapValues { (_, records) ->
                         records.map { record ->
                             val uuid = record["service_account_id"] ?: record["subject_id"]
@@ -283,7 +283,7 @@ class EntityAccessRightsService(
                             }
 
                             val subjectInfo = toJsonString(record["subject_info"])
-                                .deserializeAsMap()[JSONLD_VALUE] as Map<String, String>
+                                .deserializeAsMap()[JSONLD_VALUE_TERM] as Map<String, String>
                             val subjectSpecificInfo = when (subjectType) {
                                 SubjectType.USER -> Pair(AUTH_TERM_USERNAME, subjectInfo[AUTH_TERM_USERNAME]!!)
                                 SubjectType.GROUP -> Pair(AUTH_TERM_NAME, subjectInfo[AUTH_TERM_NAME]!!)
@@ -313,7 +313,7 @@ class EntityAccessRightsService(
     private fun rowToEntityAccessControl(row: Map<String, Any>, isStellioAdmin: Boolean): EntityAccessRights {
         val accessRight =
             if (isStellioAdmin) R_CAN_ADMIN
-            else (row["access_right"] as String).let { AccessRight.forAttributeName(it) }.orNull()!!
+            else (row["access_right"] as String).let { AccessRight.forAttributeName(it) }.getOrNull()!!
 
         return EntityAccessRights(
             id = toUri(row["entity_id"]),

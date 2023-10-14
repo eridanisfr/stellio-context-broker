@@ -1,14 +1,17 @@
 package com.egm.stellio.search.service
 
 import arrow.core.Either
-import arrow.core.continuations.either
 import arrow.core.left
+import arrow.core.raise.either
 import arrow.core.right
-import arrow.fx.coroutines.parTraverseEither
+import arrow.fx.coroutines.parMap
 import com.egm.stellio.search.model.*
 import com.egm.stellio.search.model.AggregatedAttributeInstanceResult.AggregateResult
 import com.egm.stellio.search.util.*
-import com.egm.stellio.shared.model.*
+import com.egm.stellio.shared.model.APIException
+import com.egm.stellio.shared.model.OperationNotSupportedException
+import com.egm.stellio.shared.model.ResourceNotFoundException
+import com.egm.stellio.shared.model.toNgsiLdAttribute
 import com.egm.stellio.shared.util.*
 import org.springframework.r2dbc.core.DatabaseClient
 import org.springframework.r2dbc.core.bind
@@ -37,11 +40,11 @@ class AttributeInstanceService(
                     (time, measured_value, value, geo_value, temporal_entity_attribute, 
                         instance_id, payload)
                 VALUES 
-                    (:time, :measured_value, :value, ST_GeomFromText(:geo_value), :temporal_entity_attribute, 
+                    (:time, :measured_value, :value, public.ST_GeomFromText(:geo_value), :temporal_entity_attribute, 
                         :instance_id, :payload)
                 ON CONFLICT (time, temporal_entity_attribute)
                 DO UPDATE SET value = :value, measured_value = :measured_value, payload = :payload,
-                              instance_id = :instance_id, geo_value = ST_GeomFromText(:geo_value)
+                              instance_id = :instance_id, geo_value = public.ST_GeomFromText(:geo_value)
                 """.trimIndent()
             else if (attributeInstance.timeProperty == AttributeInstance.TemporalProperty.OBSERVED_AT)
                 """
@@ -61,7 +64,7 @@ class AttributeInstanceService(
                     (time, time_property, measured_value, value, geo_value, 
                         temporal_entity_attribute, instance_id, payload, sub)
                 VALUES
-                    (:time, :time_property, :measured_value, :value, ST_GeomFromText(:geo_value), 
+                    (:time, :time_property, :measured_value, :value, public.ST_GeomFromText(:geo_value), 
                         :temporal_entity_attribute, :instance_id, :payload, :sub)
                 """.trimIndent()
             else
@@ -112,26 +115,18 @@ class AttributeInstanceService(
 
     suspend fun search(
         temporalEntitiesQuery: TemporalEntitiesQuery,
-        temporalEntityAttribute: TemporalEntityAttribute
+        temporalEntityAttribute: TemporalEntityAttribute,
+        origin: ZonedDateTime? = null
     ): Either<APIException, List<AttributeInstanceResult>> =
-        search(temporalEntitiesQuery, listOf(temporalEntityAttribute))
+        search(temporalEntitiesQuery, listOf(temporalEntityAttribute), origin)
 
     suspend fun search(
         temporalEntitiesQuery: TemporalEntitiesQuery,
-        temporalEntityAttributes: List<TemporalEntityAttribute>
+        temporalEntityAttributes: List<TemporalEntityAttribute>,
+        origin: ZonedDateTime? = null
     ): Either<APIException, List<AttributeInstanceResult>> {
         val temporalQuery = temporalEntitiesQuery.temporalQuery
         val sqlQueryBuilder = StringBuilder()
-
-        // time_bucket has a default origin set to 2000-01-03
-        // (see https://docs.timescale.com/api/latest/hyperfunctions/time_bucket/)
-        // so we force the default origin to:
-        // - timeAt if it is provided
-        // - the oldest value if not (timeAt is optional if querying a temporal entity by id)
-        val origin =
-            if (temporalEntitiesQuery.withAggregatedValues)
-                temporalQuery.timeAt ?: selectOldestDate(temporalQuery, temporalEntityAttributes)
-            else null
 
         sqlQueryBuilder.append(composeSearchSelectStatement(temporalQuery, temporalEntityAttributes, origin))
 
@@ -163,11 +158,13 @@ class AttributeInstanceService(
             null -> Unit
         }
 
-        if (temporalEntitiesQuery.withAggregatedValues)
+        if (temporalEntitiesQuery.isAggregatedWithDefinedDuration())
             sqlQueryBuilder.append(" GROUP BY temporal_entity_attribute, origin")
+        else if (temporalEntitiesQuery.withAggregatedValues)
+            sqlQueryBuilder.append(" GROUP BY temporal_entity_attribute")
         else if (temporalQuery.lastN != null)
-        // in order to get last instances, need to order by time desc
-        // final ascending ordering of instances is done in query service
+            // in order to get last instances, need to order by time desc
+            // final ascending ordering of instances is done in query service
             sqlQueryBuilder.append(" ORDER BY time DESC LIMIT ${temporalQuery.lastN}")
 
         val finalTemporalQuery = composeFinalTemporalQuery(temporalEntityAttributes, sqlQueryBuilder.toString())
@@ -205,21 +202,25 @@ class AttributeInstanceService(
         origin: ZonedDateTime?
     ) = when {
         temporalQuery.aggrPeriodDuration != null -> {
-            val allAggregates = temporalQuery.aggrMethods?.joinToString(",") {
-                val sqlAggregateExpression =
-                    aggrMethodToSqlAggregate(it, temporalEntityAttributes[0].attributeValueType)
-                "$sqlAggregateExpression as ${it.method}_value"
-            }
-            """
-            SELECT temporal_entity_attribute,
-               time_bucket('${temporalQuery.aggrPeriodDuration}', time, TIMESTAMPTZ '${origin!!}') as origin,
-               $allAggregates
-            """.trimIndent()
+            val aggrPeriodDuration = temporalQuery.aggrPeriodDuration
+            val allAggregates = temporalQuery.aggrMethods
+                ?.composeAggregationSelectClause(temporalEntityAttributes[0].attributeValueType)
+            // if retrieving a temporal entity, origin is calculated beforehand as timeAt is optional in this case
+            // if querying temporal entities, timeAt is mandatory and will be used if origin is null
+            if (aggrPeriodDuration != WHOLE_TIME_RANGE_DURATION) {
+                val computedOrigin = origin ?: temporalQuery.timeAt
+                """
+                SELECT temporal_entity_attribute,
+                    time_bucket('$aggrPeriodDuration', time, TIMESTAMPTZ '${computedOrigin!!}') as origin,
+                    $allAggregates
+                """.trimIndent()
+            } else
+                "SELECT temporal_entity_attribute, min(time) as origin, max(time) as endTime, $allAggregates "
         }
         else -> {
             val valueColumn = when (temporalEntityAttributes[0].attributeValueType) {
                 TemporalEntityAttribute.AttributeValueType.NUMBER -> "measured_value as value"
-                TemporalEntityAttribute.AttributeValueType.GEOMETRY -> "ST_AsText(geo_value) as value"
+                TemporalEntityAttribute.AttributeValueType.GEOMETRY -> "public.ST_AsText(geo_value) as value"
                 else -> "value"
             }
             val subColumn = when (temporalQuery.timeproperty) {
@@ -267,11 +268,14 @@ class AttributeInstanceService(
     private fun rowToAttributeInstanceResult(
         row: Map<String, Any>,
         temporalEntitiesQuery: TemporalEntitiesQuery
-    ): AttributeInstanceResult {
-        return if (temporalEntitiesQuery.withAggregatedValues) {
+    ): AttributeInstanceResult =
+        if (temporalEntitiesQuery.withAggregatedValues) {
             val startDateTime = toZonedDateTime(row["origin"])
             val endDateTime =
-                startDateTime.plus(Duration.parse(temporalEntitiesQuery.temporalQuery.aggrPeriodDuration!!))
+                if (!temporalEntitiesQuery.isAggregatedWithDefinedDuration())
+                    toZonedDateTime(row["endTime"])
+                else
+                    startDateTime.plus(Duration.parse(temporalEntitiesQuery.temporalQuery.aggrPeriodDuration))
             // in a row, there is the result for each requested aggregation method
             val values = temporalEntitiesQuery.temporalQuery.aggrMethods!!.map {
                 val value = row["${it.method}_value"] ?: ""
@@ -296,7 +300,6 @@ class AttributeInstanceService(
             timeproperty = temporalEntitiesQuery.temporalQuery.timeproperty.propertyName,
             sub = row["sub"] as? String
         )
-    }
 
     @Transactional
     suspend fun modifyAttributeInstance(
@@ -392,8 +395,8 @@ class AttributeInstanceService(
         entityId: URI,
         attributeName: ExpandedTerm,
         datasetId: URI?
-    ): Either<APIException, Unit> =
-        attributesInstancesTables.parTraverseEither { attributeInstanceTable ->
+    ): Either<APIException, Unit> = either {
+        attributesInstancesTables.parMap { attributeInstanceTable ->
             val deleteQuery =
                 """
                 DELETE FROM $attributeInstanceTable
@@ -415,14 +418,16 @@ class AttributeInstanceService(
                     else it
                 }
                 .execute()
+                .bind()
         }.map { }
+    }
 
     @Transactional
     suspend fun deleteAllInstancesOfAttribute(
         entityId: URI,
         attributeName: ExpandedTerm
-    ): Either<APIException, Unit> =
-        attributesInstancesTables.parTraverseEither { attributeInstanceTable ->
+    ): Either<APIException, Unit> = either {
+        attributesInstancesTables.parMap { attributeInstanceTable ->
             val deleteQuery =
                 """
                 DELETE FROM $attributeInstanceTable
@@ -439,26 +444,26 @@ class AttributeInstanceService(
                 .bind("entity_id", entityId)
                 .bind("attribute_name", attributeName)
                 .execute()
+                .bind()
         }.map { }
+    }
 
     @Transactional
     suspend fun deleteInstancesOfEntity(
-        entityId: URI
-    ): Either<APIException, Unit> =
-        attributesInstancesTables.parTraverseEither { attributeInstanceTable ->
+        uuids: List<UUID>
+    ): Either<APIException, Unit> = either {
+        attributesInstancesTables.parMap { attributeInstanceTable ->
             val deleteQuery =
                 """
                 DELETE FROM $attributeInstanceTable
-                WHERE temporal_entity_attribute IN ( 
-                    SELECT id 
-                    FROM temporal_entity_attribute 
-                    WHERE entity_id = :entity_id 
-                )
+                WHERE temporal_entity_attribute IN (:uuids)
                 """.trimIndent()
 
             databaseClient
                 .sql(deleteQuery)
-                .bind("entity_id", entityId)
+                .bind("uuids", uuids)
                 .execute()
+                .bind()
         }.map { }
+    }
 }

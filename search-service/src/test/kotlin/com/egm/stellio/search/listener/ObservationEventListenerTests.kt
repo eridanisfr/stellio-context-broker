@@ -44,6 +44,7 @@ class ObservationEventListenerTests {
         coEvery {
             entityPayloadService.createEntity(any<String>(), any(), any())
         } returns Unit.right()
+        coEvery { entityEventService.publishEntityCreateEvent(any(), any(), any(), any()) } returns Job()
 
         observationEventListener.dispatchObservationMessage(observationEvent)
 
@@ -55,7 +56,7 @@ class ObservationEventListenerTests {
             )
         }
 
-        verify {
+        coVerify(timeout = 1000L) {
             entityEventService.publishEntityCreateEvent(
                 eq("0123456789-1234-5678-987654321"),
                 eq(expectedEntityId),
@@ -82,7 +83,7 @@ class ObservationEventListenerTests {
             notUpdated = arrayListOf()
         ).right()
 
-        every {
+        coEvery {
             entityEventService.publishAttributeChangeEvents(any(), any(), any(), any(), any(), any())
         } returns Job()
 
@@ -95,7 +96,7 @@ class ObservationEventListenerTests {
                 null
             )
         }
-        verify {
+        coVerify(timeout = 1000L) {
             entityEventService.publishAttributeChangeEvents(
                 null,
                 eq(expectedEntityId),
@@ -133,7 +134,7 @@ class ObservationEventListenerTests {
         val observationEvent = loadSampleData("events/entity/attributeAppendNumericPropDatasetIdEvent.json")
 
         coEvery {
-            entityPayloadService.appendAttributes(any(), any(), any(), any(), any())
+            entityPayloadService.appendAttributes(any(), any(), any(), any())
         } returns UpdateResult(
             listOf(
                 UpdatedDetails(
@@ -146,7 +147,7 @@ class ObservationEventListenerTests {
         ).right()
         val mockedJsonLdEntity = mockkClass(JsonLdEntity::class, relaxed = true)
         every { mockedJsonLdEntity.types } returns listOf(BEEHIVE_TYPE)
-        every {
+        coEvery {
             entityEventService.publishAttributeChangeEvents(any(), any(), any(), any(), any(), any())
         } returns Job()
 
@@ -155,17 +156,12 @@ class ObservationEventListenerTests {
         coVerify {
             entityPayloadService.appendAttributes(
                 expectedEntityId,
-                match {
-                    it.size == 1 &&
-                        it.first().name == TEMPERATURE_PROPERTY &&
-                        it.first().getAttributeInstances().size == 1
-                },
                 any(),
                 false,
                 null
             )
         }
-        verify {
+        coVerify(timeout = 1000L) {
             entityEventService.publishAttributeChangeEvents(
                 null,
                 eq(expectedEntityId),
@@ -189,7 +185,7 @@ class ObservationEventListenerTests {
         val observationEvent = loadSampleData("events/entity/attributeAppendNumericPropDatasetIdEvent.json")
 
         coEvery {
-            entityPayloadService.appendAttributes(any(), any(), any(), any(), any())
+            entityPayloadService.appendAttributes(any(), any(), any(), any())
         } returns UpdateResult(
             emptyList(),
             listOf(NotUpdatedDetails(TEMPERATURE_PROPERTY, "Property could not be appended"))
@@ -197,16 +193,6 @@ class ObservationEventListenerTests {
 
         observationEventListener.dispatchObservationMessage(observationEvent)
 
-        verify { entityEventService wasNot called }
-    }
-
-    @Test
-    fun `it should ignore an invalid ATTRIBUTE_APPEND event`() = runTest {
-        val observationEvent = loadSampleData("events/entity/invalid/humidityAppendEvent.jsonld")
-
-        observationEventListener.dispatchObservationMessage(observationEvent)
-
-        coVerify { entityPayloadService wasNot called }
         verify { entityEventService wasNot called }
     }
 

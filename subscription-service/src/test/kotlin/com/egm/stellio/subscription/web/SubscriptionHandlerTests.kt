@@ -1,34 +1,31 @@
 package com.egm.stellio.subscription.web
 
 import arrow.core.Either
-import arrow.core.Some
 import arrow.core.left
 import arrow.core.right
-import com.egm.stellio.shared.WithMockCustomUser
+import com.egm.stellio.shared.config.ApplicationProperties
 import com.egm.stellio.shared.model.BadRequestDataException
 import com.egm.stellio.shared.model.InternalErrorException
 import com.egm.stellio.shared.util.*
 import com.egm.stellio.shared.util.JsonUtils.deserializeAsMap
-import com.egm.stellio.subscription.config.WebSecurityTestConfig
-import com.egm.stellio.subscription.service.SubscriptionEventService
 import com.egm.stellio.subscription.service.SubscriptionService
 import com.egm.stellio.subscription.utils.gimmeRawSubscription
 import com.ninjasquad.springmockk.MockkBean
 import io.mockk.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.test.runTest
 import org.hamcrest.core.Is
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient
 import org.springframework.boot.test.autoconfigure.web.reactive.WebFluxTest
-import org.springframework.context.annotation.Import
 import org.springframework.core.io.ClassPathResource
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
-import org.springframework.security.test.context.support.WithAnonymousUser
+import org.springframework.security.test.web.reactive.server.SecurityMockServerConfigurers.csrf
+import org.springframework.security.test.web.reactive.server.SecurityMockServerConfigurers.mockJwt
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.reactive.server.WebTestClient
 
@@ -36,8 +33,7 @@ import org.springframework.test.web.reactive.server.WebTestClient
 @AutoConfigureWebTestClient(timeout = "30000")
 @ActiveProfiles("test")
 @WebFluxTest(SubscriptionHandler::class)
-@Import(WebSecurityTestConfig::class)
-@WithMockCustomUser(name = "Mock User", sub = "60AAEBA3-C0C7-42B6-8CB0-0D30857F210E")
+@EnableConfigurationProperties(ApplicationProperties::class)
 class SubscriptionHandlerTests {
 
     @Autowired
@@ -46,12 +42,11 @@ class SubscriptionHandlerTests {
     @MockkBean
     private lateinit var subscriptionService: SubscriptionService
 
-    @MockkBean
-    private lateinit var subscriptionEventService: SubscriptionEventService
-
     @BeforeAll
     fun configureWebClientDefaults() {
         webClient = webClient.mutate()
+            .apply(mockJwt().jwt { it.subject(MOCK_USER_SUB) })
+            .apply(csrf())
             .defaultHeaders {
                 it.accept = listOf(JSON_LD_MEDIA_TYPE)
                 it.contentType = JSON_LD_MEDIA_TYPE
@@ -59,7 +54,6 @@ class SubscriptionHandlerTests {
             .build()
     }
 
-    private val sub = Some("60AAEBA3-C0C7-42B6-8CB0-0D30857F210E")
     private val subscriptionId = "urn:ngsi-ld:Subscription:1".toUri()
 
     @Test
@@ -181,7 +175,6 @@ class SubscriptionHandlerTests {
         coEvery { subscriptionService.validateNewSubscription(any()) } returns Unit.right()
         coEvery { subscriptionService.exists(any()) } returns false.right()
         coEvery { subscriptionService.create(any(), any()) } returns Unit.right()
-        coEvery { subscriptionEventService.publishSubscriptionCreateEvent(any(), any(), any()) } returns Job()
 
         webClient.post()
             .uri("/ngsi-ld/v1/subscriptions")
@@ -189,14 +182,6 @@ class SubscriptionHandlerTests {
             .exchange()
             .expectStatus().isCreated
             .expectHeader().value("Location", Is.`is`("/ngsi-ld/v1/subscriptions/urn:ngsi-ld:Subscription:1"))
-
-        coVerify {
-            subscriptionEventService.publishSubscriptionCreateEvent(
-                eq("60AAEBA3-C0C7-42B6-8CB0-0D30857F210E"),
-                match { it == "urn:ngsi-ld:Subscription:1".toUri() },
-                eq(listOf(APIC_COMPOUND_CONTEXT))
-            )
-        }
     }
 
     @Test
@@ -216,8 +201,6 @@ class SubscriptionHandlerTests {
                     "\"title\":\"The referred element already exists\"," +
                     "\"detail\":\"${subscriptionAlreadyExistsMessage(subscriptionId)}\"}"
             )
-
-        verify { subscriptionEventService wasNot called }
     }
 
     @Test
@@ -500,14 +483,12 @@ class SubscriptionHandlerTests {
     @Test
     fun `update subscription should return a 204 if JSON-LD payload is correct`() = runTest {
         val jsonLdFile = ClassPathResource("/ngsild/subscription_update.json")
-        val expectedOperationPayload = ClassPathResource("/ngsild/events/sent/subscription_update_event_payload.json")
         val subscriptionId = subscriptionId
         val parsedSubscription = jsonLdFile.inputStream.readBytes().toString(Charsets.UTF_8).deserializeAsMap()
 
         coEvery { subscriptionService.exists(any()) } returns true.right()
         coEvery { subscriptionService.isCreatorOf(any(), any()) } returns true.right()
         coEvery { subscriptionService.update(any(), any(), any()) } returns Unit.right()
-        coEvery { subscriptionEventService.publishSubscriptionUpdateEvent(any(), any(), any(), any()) } returns Job()
 
         webClient.patch()
             .uri("/ngsi-ld/v1/subscriptions/$subscriptionId")
@@ -518,17 +499,7 @@ class SubscriptionHandlerTests {
         coVerify { subscriptionService.exists(eq(subscriptionId)) }
         coVerify { subscriptionService.isCreatorOf(subscriptionId, sub) }
         coVerify { subscriptionService.update(eq(subscriptionId), parsedSubscription, listOf(APIC_COMPOUND_CONTEXT)) }
-        coVerify {
-            subscriptionEventService.publishSubscriptionUpdateEvent(
-                eq("60AAEBA3-C0C7-42B6-8CB0-0D30857F210E"),
-                match { it == subscriptionId },
-                match {
-                    it.removeNoise() ==
-                        expectedOperationPayload.inputStream.readBytes().toString(Charsets.UTF_8).removeNoise()
-                },
-                any()
-            )
-        }
+
         confirmVerified(subscriptionService)
     }
 
@@ -560,7 +531,6 @@ class SubscriptionHandlerTests {
         coVerify { subscriptionService.exists(eq(subscriptionId)) }
         coVerify { subscriptionService.isCreatorOf(subscriptionId, sub) }
         coVerify { subscriptionService.update(eq(subscriptionId), parsedSubscription, listOf(APIC_COMPOUND_CONTEXT)) }
-        verify { subscriptionEventService wasNot called }
 
         confirmVerified(subscriptionService)
     }
@@ -648,9 +618,7 @@ class SubscriptionHandlerTests {
         val subscription = gimmeRawSubscription()
         coEvery { subscriptionService.exists(any()) } returns true.right()
         coEvery { subscriptionService.isCreatorOf(any(), any()) } returns true.right()
-        coEvery { subscriptionService.getContextsForSubscription(any()) } returns listOf(APIC_COMPOUND_CONTEXT).right()
         coEvery { subscriptionService.delete(any()) } returns Unit.right()
-        every { subscriptionEventService.publishSubscriptionDeleteEvent(any(), any(), any()) } returns Job()
 
         webClient.delete()
             .uri("/ngsi-ld/v1/subscriptions/${subscription.id}")
@@ -660,15 +628,7 @@ class SubscriptionHandlerTests {
 
         coVerify { subscriptionService.exists(subscription.id) }
         coVerify { subscriptionService.isCreatorOf(subscription.id, sub) }
-        coVerify { subscriptionService.getContextsForSubscription(subscription.id) }
         coVerify { subscriptionService.delete(eq(subscription.id)) }
-        verify {
-            subscriptionEventService.publishSubscriptionDeleteEvent(
-                eq("60AAEBA3-C0C7-42B6-8CB0-0D30857F210E"),
-                match { it == subscription.id },
-                eq(listOf(APIC_COMPOUND_CONTEXT))
-            )
-        }
 
         confirmVerified(subscriptionService)
     }
@@ -692,7 +652,6 @@ class SubscriptionHandlerTests {
             )
 
         coVerify { subscriptionService.exists(subscriptionId) }
-        verify { subscriptionEventService wasNot called }
 
         confirmVerified(subscriptionService)
     }
@@ -744,14 +703,5 @@ class SubscriptionHandlerTests {
 
         coVerify { subscriptionService.exists(subscriptionId) }
         coVerify { subscriptionService.isCreatorOf(subscriptionId, sub) }
-    }
-
-    @Test
-    @WithAnonymousUser
-    fun `it should not authorize an anonymous to call the API`() {
-        webClient.post()
-            .uri("/ngsi-ld/v1/subscriptions")
-            .exchange()
-            .expectStatus().isUnauthorized
     }
 }

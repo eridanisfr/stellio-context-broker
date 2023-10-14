@@ -7,10 +7,8 @@ import arrow.core.getOrElse
 import com.egm.stellio.search.util.*
 import com.egm.stellio.shared.model.APIException
 import com.egm.stellio.shared.model.AccessDeniedException
-import com.egm.stellio.shared.util.ADMIN_ROLES
-import com.egm.stellio.shared.util.GlobalRole
-import com.egm.stellio.shared.util.Sub
-import com.egm.stellio.shared.util.SubjectType
+import com.egm.stellio.shared.util.*
+import com.egm.stellio.shared.util.JsonUtils.deserializeAsMap
 import org.springframework.data.r2dbc.core.R2dbcEntityTemplate
 import org.springframework.data.relational.core.query.Criteria
 import org.springframework.data.relational.core.query.Query
@@ -74,7 +72,7 @@ class SubjectReferentialService(
             )
             .bind("subject_id", (sub as Some).value)
             .oneToResult(AccessDeniedException("No subject information found for ${sub.value}")) {
-                val subs = (toOptionalList<Sub>(it["groups_memberships"]) ?: emptyList())
+                val subs = toOptionalList<Sub>(it["groups_memberships"]).orEmpty()
                     .plus(it["subject_id"] as Sub)
                 if (it["service_account_id"] != null)
                     subs.plus(it["service_account_id"] as Sub)
@@ -158,6 +156,45 @@ class SubjectReferentialService(
                 SELECT count(*) as count
                 FROM subject_referential
                 WHERE subject_type = '${SubjectType.GROUP.name}'
+                """.trimIndent()
+            )
+            .oneToResult { toInt(it["count"]) }
+
+    suspend fun getUsers(offset: Int, limit: Int): List<User> =
+        databaseClient
+            .sql(
+                """
+                SELECT subject_id AS user_id, (subject_info->'value'->>'username') AS username,
+                    (subject_info->'value'->>'givenName') AS givenName,
+                    (subject_info->'value'->>'familyName') AS familyName,
+                    subject_info
+                FROM subject_referential
+                WHERE subject_type = '${SubjectType.USER.name}'
+                ORDER BY username
+                LIMIT :limit
+                OFFSET :offset
+                """.trimIndent()
+            )
+            .bind("limit", limit)
+            .bind("offset", offset)
+            .allToMappedList {
+                User(
+                    id = it["user_id"] as String,
+                    username = it["username"] as String,
+                    givenName = it["givenName"] as? String,
+                    familyName = it["familyName"] as? String,
+                    subjectInfo = toJsonString(it["subject_info"])
+                        .deserializeAsMap()[JsonLdUtils.JSONLD_VALUE_TERM] as Map<String, String>
+                )
+            }
+
+    suspend fun getUsersCount(): Either<APIException, Int> =
+        databaseClient
+            .sql(
+                """
+                SELECT count(*) as count
+                FROM subject_referential
+                WHERE subject_type = '${SubjectType.USER.name}'
                 """.trimIndent()
             )
             .oneToResult { toInt(it["count"]) }

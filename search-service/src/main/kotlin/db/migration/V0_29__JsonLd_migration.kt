@@ -1,5 +1,3 @@
-// ktlint-disable filename
-
 package db.migration
 
 import arrow.core.Either
@@ -13,7 +11,7 @@ import com.egm.stellio.shared.util.AuthContextModel.AUTH_PROP_SAP
 import com.egm.stellio.shared.util.ExpandedAttributeInstance
 import com.egm.stellio.shared.util.ExpandedTerm
 import com.egm.stellio.shared.util.JsonLdUtils.EGM_BASE_CONTEXT_URL
-import com.egm.stellio.shared.util.JsonLdUtils.JSONLD_EXPANDED_ENTITY_MANDATORY_FIELDS
+import com.egm.stellio.shared.util.JsonLdUtils.JSONLD_EXPANDED_ENTITY_CORE_MEMBERS
 import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_CREATED_AT_PROPERTY
 import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_DATASET_ID_PROPERTY
 import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_MODIFIED_AT_PROPERTY
@@ -237,7 +235,7 @@ class V0_29__JsonLd_migration : BaseJavaMigration() {
                             temporal_entity_attribute, instance_id, payload)
                     VALUES
                         ('$createdAt', '${AttributeInstance.TemporalProperty.CREATED_AT}', 
-                            ST_GeomFromText('${temporalAttributesMetadata.value.geoValue!!.value}'), 
+                            public.ST_GeomFromText('${temporalAttributesMetadata.value.geoValue!!.value}'), 
                             '$teaId', '$attributeInstanceId', $$$serializedAttributePayload$$)
                     """.trimIndent()
                 else
@@ -323,7 +321,7 @@ class V0_29__JsonLd_migration : BaseJavaMigration() {
 internal fun Map<String, Any>.keepOnlyOneInstanceByDatasetId(): Map<String, Any> =
     this.mapValues {
         val instance =
-            if (!JSONLD_EXPANDED_ENTITY_MANDATORY_FIELDS.contains(it.key) && it.value is List<*>) {
+            if (!JSONLD_EXPANDED_ENTITY_CORE_MEMBERS.contains(it.key) && it.value is List<*>) {
                 (it.value as List<Map<String, Any>>).distinctBy {
                     it[NGSILD_DATASET_ID_PROPERTY]
                 }

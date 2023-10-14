@@ -4,16 +4,12 @@ import arrow.core.Some
 import com.egm.stellio.shared.model.BadRequestDataException
 import com.egm.stellio.shared.model.JsonLdEntity
 import com.egm.stellio.shared.model.NotImplementedException
-import com.egm.stellio.shared.model.Notification
 import com.egm.stellio.shared.util.*
 import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_CORE_CONTEXT
 import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_SUBSCRIPTION_TERM
-import com.egm.stellio.subscription.model.Endpoint
-import com.egm.stellio.subscription.model.EndpointInfo
-import com.egm.stellio.subscription.model.EntityInfo
+import com.egm.stellio.subscription.model.*
 import com.egm.stellio.subscription.model.NotificationParams.FormatType
 import com.egm.stellio.subscription.model.NotificationParams.StatusType
-import com.egm.stellio.subscription.model.Subscription
 import com.egm.stellio.subscription.support.WithTimescaleContainer
 import com.egm.stellio.subscription.utils.ParsingUtils
 import com.egm.stellio.subscription.utils.gimmeRawSubscription
@@ -92,6 +88,7 @@ class SubscriptionServiceTests : WithTimescaleContainer {
             withNotifParams = Pair(FormatType.NORMALIZED, listOf(INCOMING_PROPERTY))
         ).copy(
             subscriptionName = "Subscription 1",
+            scopeQ = "/A/+/C,/B",
             entities = setOf(
                 EntityInfo(id = null, idPattern = null, type = BEEHIVE_TYPE),
                 EntityInfo(id = null, idPattern = "urn:ngsi-ld:Beekeeper:1234*", type = BEEKEEPER_TYPE)
@@ -313,10 +310,10 @@ class SubscriptionServiceTests : WithTimescaleContainer {
                     it.notification.attributes == listOf(INCOMING_PROPERTY) &&
                     it.notification.format == FormatType.NORMALIZED &&
                     it.notification.endpoint == Endpoint(
-                    URI("http://localhost:8089/notification"),
-                    Endpoint.AcceptType.JSONLD,
-                    null
-                ) &&
+                        URI("http://localhost:8089/notification"),
+                        Endpoint.AcceptType.JSONLD,
+                        null
+                    ) &&
                     it.entities.size == 1
             }
     }
@@ -333,10 +330,10 @@ class SubscriptionServiceTests : WithTimescaleContainer {
                         it.notification.attributes == listOf(INCOMING_PROPERTY) &&
                         it.notification.format == FormatType.NORMALIZED &&
                         it.notification.endpoint == Endpoint(
-                        URI("http://localhost:8089/notification"),
-                        Endpoint.AcceptType.JSONLD,
-                        listOf(EndpointInfo("Authorization-token", "Authorization-token-value"))
-                    ) &&
+                            URI("http://localhost:8089/notification"),
+                            Endpoint.AcceptType.JSONLD,
+                            listOf(EndpointInfo("Authorization-token", "Authorization-token-value"))
+                        ) &&
                         it.entities.size == 2 &&
                         it.geoQ != null &&
                         it.geoQ!!.georel == "within" &&
@@ -358,10 +355,10 @@ class SubscriptionServiceTests : WithTimescaleContainer {
                     it.notification.attributes == listOf(INCOMING_PROPERTY) &&
                     it.notification.format == FormatType.NORMALIZED &&
                     it.notification.endpoint == Endpoint(
-                    URI("http://localhost:8089/notification"),
-                    Endpoint.AcceptType.JSONLD,
-                    listOf(EndpointInfo("Authorization-token", "Authorization-token-value"))
-                ) &&
+                        URI("http://localhost:8089/notification"),
+                        Endpoint.AcceptType.JSONLD,
+                        listOf(EndpointInfo("Authorization-token", "Authorization-token-value"))
+                    ) &&
                     it.entities.size == 2 &&
                     it.isActive
             }
@@ -378,10 +375,10 @@ class SubscriptionServiceTests : WithTimescaleContainer {
                     it.notification.attributes == listOf(INCOMING_PROPERTY) &&
                     it.notification.format == FormatType.NORMALIZED &&
                     it.notification.endpoint == Endpoint(
-                    URI("http://localhost:8089/notification"),
-                    Endpoint.AcceptType.JSONLD,
-                    null
-                ) &&
+                        URI("http://localhost:8089/notification"),
+                        Endpoint.AcceptType.JSONLD,
+                        null
+                    ) &&
                     it.entities.size == 1 &&
                     !it.isActive
             }
@@ -491,9 +488,9 @@ class SubscriptionServiceTests : WithTimescaleContainer {
             .element(0).matches {
                 it.subscriptionName == "Subscription 1" &&
                     it.notification.endpoint == Endpoint(
-                    URI("http://localhost:8089/notification"),
-                    Endpoint.AcceptType.JSONLD
-                ) &&
+                        URI("http://localhost:8089/notification"),
+                        Endpoint.AcceptType.JSONLD
+                    ) &&
                     it.entities.isEmpty()
             }
     }
@@ -649,6 +646,7 @@ class SubscriptionServiceTests : WithTimescaleContainer {
             "subscriptionName" to "My Subscription Updated",
             "description" to "My beautiful subscription has been updated",
             "q" to "foodQuantity>=150",
+            "scopeQ" to "/A/#,/B",
             "geoQ" to mapOf(
                 "georel" to "equals",
                 "geometry" to "Point",
@@ -665,6 +663,7 @@ class SubscriptionServiceTests : WithTimescaleContainer {
                 it.subscriptionName == "My Subscription Updated" &&
                     it.description == "My beautiful subscription has been updated" &&
                     it.q == "foodQuantity>=150" &&
+                    it.scopeQ == "/A/#,/B" &&
                     it.geoQ!!.georel == "equals" &&
                     it.geoQ!!.geometry == "Point" &&
                     it.geoQ!!.coordinates == "[100.0, 0.0]" &&
@@ -696,8 +695,8 @@ class SubscriptionServiceTests : WithTimescaleContainer {
                     it.notification.endpoint.accept.name == "JSONLD" &&
                     it.notification.endpoint.uri.toString() == "http://localhost:8080" &&
                     it.notification.endpoint.info == listOf(
-                    EndpointInfo("Authorization-token", "Authorization-token-newValue")
-                ) &&
+                        EndpointInfo("Authorization-token", "Authorization-token-newValue")
+                    ) &&
                     it.notification.endpoint.info!!.size == 1
             }
     }
@@ -877,6 +876,20 @@ class SubscriptionServiceTests : WithTimescaleContainer {
         val query = "foodName.isHealthy!=false"
         subscriptionService.isMatchingQQuery(query, jsonldEntity, listOf(APIC_COMPOUND_CONTEXT))
             .shouldSucceedWith { assertTrue(it) }
+    }
+
+    @Test
+    fun `it should return true if entity matches scope query`() = runTest {
+        val scopeQuery = "/Nantes/#"
+        subscriptionService.isMatchingScopeQQuery(scopeQuery, jsonldEntity)
+            .shouldSucceedWith { assertTrue(it) }
+    }
+
+    @Test
+    fun `it should return false if entity does not match scope query`() = runTest {
+        val scopeQuery = "/Valbonne/#"
+        subscriptionService.isMatchingScopeQQuery(scopeQuery, jsonldEntity)
+            .shouldSucceedWith { assertFalse(it) }
     }
 
     @Test

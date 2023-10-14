@@ -7,6 +7,7 @@ import com.egm.stellio.shared.util.*
 import com.egm.stellio.shared.util.JsonLdUtils.JSONLD_ID
 import com.egm.stellio.shared.util.JsonLdUtils.JSONLD_TYPE
 import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_CREATED_AT_PROPERTY
+import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_MODIFIED_AT_PROPERTY
 import com.egm.stellio.shared.util.JsonLdUtils.castAttributeValue
 import java.time.ZonedDateTime
 
@@ -25,14 +26,19 @@ data class JsonLdEntity(
         else ResourceNotFoundException(entityOrAttrsNotFoundMessage(id, expandedAttributes)).left()
 
     fun getAttributes(): ExpandedAttributes =
-        members.filter { !JsonLdUtils.JSONLD_EXPANDED_ENTITY_MANDATORY_FIELDS.contains(it.key) }
+        members.filter { !JsonLdUtils.JSONLD_EXPANDED_ENTITY_CORE_MEMBERS.contains(it.key) }
             .mapValues { castAttributeValue(it.value) }
 
-    // called at entity creation time to populate entity and attributes with createdAt information
-    fun populateCreatedAt(createdAt: ZonedDateTime): JsonLdEntity =
+    fun getScopes(): List<String>? =
+        (members as Map<String, List<Any>>).getScopes()
+
+    /**
+     * Called at entity creation time to populate entity and attributes with createdAt information
+     */
+    fun populateCreationTimeDate(createdAt: ZonedDateTime): JsonLdEntity =
         JsonLdEntity(
             members = members.mapValues {
-                if (JsonLdUtils.JSONLD_EXPANDED_ENTITY_MANDATORY_FIELDS.contains(it.key))
+                if (JsonLdUtils.JSONLD_EXPANDED_ENTITY_CORE_MEMBERS.contains(it.key))
                     it.value
                 else castAttributeValue(it.value).map { expandedAttributeInstance ->
                     expandedAttributeInstance.addDateTimeProperty(
@@ -41,6 +47,27 @@ data class JsonLdEntity(
                     ) as ExpandedAttributeInstance
                 }
             }.addDateTimeProperty(NGSILD_CREATED_AT_PROPERTY, createdAt),
+            contexts = contexts
+        )
+
+    /**
+     * Called when replacing entity to populate entity and attributes with createdAt and modifiedAt information
+     * for attributes, the modification date is added as the creation date
+     */
+    fun populateReplacementTimeDates(createdAt: ZonedDateTime, replacedAt: ZonedDateTime): JsonLdEntity =
+        JsonLdEntity(
+            members = members.mapValues {
+                if (JsonLdUtils.JSONLD_EXPANDED_ENTITY_CORE_MEMBERS.contains(it.key))
+                    it.value
+                else castAttributeValue(it.value).map { expandedAttributeInstance ->
+                    expandedAttributeInstance.addDateTimeProperty(
+                        NGSILD_CREATED_AT_PROPERTY,
+                        replacedAt
+                    ) as ExpandedAttributeInstance
+                }
+            }
+                .addDateTimeProperty(NGSILD_CREATED_AT_PROPERTY, createdAt)
+                .addDateTimeProperty(NGSILD_MODIFIED_AT_PROPERTY, replacedAt),
             contexts = contexts
         )
 

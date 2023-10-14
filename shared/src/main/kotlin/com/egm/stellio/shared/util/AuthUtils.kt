@@ -1,6 +1,8 @@
 package com.egm.stellio.shared.util
 
 import arrow.core.*
+import com.egm.stellio.shared.model.*
+import com.egm.stellio.shared.util.AuthContextModel.AUTHORIZATION_COMPOUND_CONTEXT
 import com.egm.stellio.shared.util.AuthContextModel.AUTHORIZATION_ONTOLOGY
 import com.egm.stellio.shared.util.AuthContextModel.AUTH_REL_CAN_ADMIN
 import com.egm.stellio.shared.util.AuthContextModel.AUTH_REL_CAN_READ
@@ -10,6 +12,7 @@ import com.egm.stellio.shared.util.GlobalRole.STELLIO_CREATOR
 import com.egm.stellio.shared.util.JsonLdUtils.EGM_BASE_CONTEXT_URL
 import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_CORE_CONTEXT
 import kotlinx.coroutines.reactive.awaitFirst
+import org.springframework.http.HttpHeaders
 import org.springframework.security.core.context.ReactiveSecurityContextHolder
 import org.springframework.security.core.context.SecurityContextImpl
 import reactor.core.publisher.Mono
@@ -27,6 +30,7 @@ object AuthContextModel {
     const val AUTHORIZATION_ONTOLOGY = "https://ontology.eglobalmark.com/authorization#"
 
     const val USER_COMPACT_TYPE = "User"
+    const val USER_TYPE: ExpandedTerm = AUTHORIZATION_ONTOLOGY + USER_COMPACT_TYPE
     const val GROUP_COMPACT_TYPE = "Group"
     const val GROUP_TYPE: ExpandedTerm = AUTHORIZATION_ONTOLOGY + GROUP_COMPACT_TYPE
     const val CLIENT_COMPACT_TYPE = "Client"
@@ -44,14 +48,15 @@ object AuthContextModel {
     const val AUTH_TERM_ROLES = "roles"
     const val AUTH_TERM_KIND = "kind"
     const val AUTH_TERM_USERNAME = "username"
+    const val AUTH_PROP_USERNAME = AUTHORIZATION_ONTOLOGY + AUTH_TERM_USERNAME
     const val AUTH_TERM_GIVEN_NAME = "givenName"
+    const val AUTH_PROP_GIVEN_NAME = AUTHORIZATION_ONTOLOGY + AUTH_TERM_GIVEN_NAME
     const val AUTH_TERM_FAMILY_NAME = "familyName"
+    const val AUTH_PROP_FAMILY_NAME = AUTHORIZATION_ONTOLOGY + AUTH_TERM_FAMILY_NAME
     const val AUTH_TERM_SAP = "specificAccessPolicy"
     const val AUTH_PROP_SAP = AUTHORIZATION_ONTOLOGY + AUTH_TERM_SAP
     const val AUTH_TERM_RIGHT = "right"
     const val AUTH_PROP_RIGHT: ExpandedTerm = AUTHORIZATION_ONTOLOGY + AUTH_TERM_RIGHT
-    val AUTH_SUBJECT_INFO_MEMBERS: Set<String> =
-        setOf(AUTH_TERM_USERNAME, AUTH_TERM_GIVEN_NAME, AUTH_TERM_FAMILY_NAME, AUTH_TERM_CLIENT_ID, AUTH_TERM_NAME)
 
     const val AUTH_TERM_IS_MEMBER_OF = "isMemberOf"
     const val AUTH_REL_IS_MEMBER_OF: ExpandedTerm = AUTHORIZATION_ONTOLOGY + AUTH_TERM_IS_MEMBER_OF
@@ -94,6 +99,23 @@ fun String.extractSub(): Sub =
 // specific to authz terms where we know the compacted term is what is after the last # character
 fun ExpandedTerm.toCompactTerm(): String = this.substringAfterLast("#")
 
+fun NgsiLdEntity.getSpecificAccessPolicy(): Either<APIException, AuthContextModel.SpecificAccessPolicy>? =
+    this.properties.find { it.name == AuthContextModel.AUTH_PROP_SAP }?.getSpecificAccessPolicy()
+
+fun NgsiLdAttribute.getSpecificAccessPolicy(): Either<APIException, AuthContextModel.SpecificAccessPolicy> {
+    val ngsiLdAttributeInstances = this.getAttributeInstances()
+    if (ngsiLdAttributeInstances.size > 1)
+        return BadRequestDataException("Payload must contain a single attribute instance").left()
+    val ngsiLdAttributeInstance = ngsiLdAttributeInstances[0]
+    if (ngsiLdAttributeInstance !is NgsiLdPropertyInstance)
+        return BadRequestDataException("Payload must be a property").left()
+    return try {
+        AuthContextModel.SpecificAccessPolicy.valueOf(ngsiLdAttributeInstance.value.toString()).right()
+    } catch (e: java.lang.IllegalArgumentException) {
+        BadRequestDataException("Value must be one of AUTH_READ or AUTH_WRITE (${e.message})").left()
+    }
+}
+
 enum class SubjectType {
     USER,
     GROUP,
@@ -129,12 +151,11 @@ enum class AccessRight(val attributeName: String) {
     }
 }
 
-fun List<String>.addAuthzContextIfNeeded(): List<String> =
-    if (this.size == 1 && this[0] == NGSILD_CORE_CONTEXT)
-        this.plus(AuthContextModel.AUTHORIZATION_CONTEXT)
-    else this
+fun getAuthzContextFromLinkHeaderOrDefault(httpHeaders: HttpHeaders): Either<APIException, String> =
+    getContextFromLinkHeader(httpHeaders.getOrEmpty(HttpHeaders.LINK))
+        .map { it ?: AUTHORIZATION_COMPOUND_CONTEXT }
 
-fun String.addAuthzContextIfNeeded(): String =
-    if (this == NGSILD_CORE_CONTEXT)
-        AuthContextModel.AUTHORIZATION_COMPOUND_CONTEXT
+fun List<String>.replaceDefaultContextToAuthzContext() =
+    if (this.size == 1 && this[0] == NGSILD_CORE_CONTEXT)
+        listOf(AUTHORIZATION_COMPOUND_CONTEXT)
     else this
