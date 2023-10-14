@@ -2,15 +2,12 @@ package com.egm.stellio.search.service
 
 import com.egm.stellio.search.model.*
 import com.egm.stellio.search.model.AggregatedAttributeInstanceResult.AggregateResult
+import com.egm.stellio.search.scope.ScopeInstanceResult
 import com.egm.stellio.search.support.EMPTY_JSON_PAYLOAD
 import com.egm.stellio.search.util.TemporalEntityAttributeInstancesResult
 import com.egm.stellio.search.util.TemporalEntityBuilder
 import com.egm.stellio.shared.util.*
-import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_CORE_CONTEXT
-import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_NOTIFICATION_ATTR_PROPERTY
-import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_SUBSCRIPTION_PROPERTY
 import com.egm.stellio.shared.util.JsonUtils.serializeObject
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.MethodSource
@@ -22,13 +19,13 @@ import java.time.ZonedDateTime
 @ActiveProfiles("test")
 class TemporalEntityBuilderTests {
 
-    private val now = Instant.now().atZone(ZoneOffset.UTC)
+    private val now = ngsiLdDateTime()
 
     @Test
     fun `it should return a temporal entity with an empty array of instances if it has no temporal history`() {
         val temporalEntityAttribute = TemporalEntityAttribute(
-            entityId = "urn:ngsi-ld:Subscription:1234".toUri(),
-            attributeName = NGSILD_NOTIFICATION_ATTR_PROPERTY,
+            entityId = "urn:ngsi-ld:Beehive:1234".toUri(),
+            attributeName = OUTGOING_PROPERTY,
             attributeValueType = TemporalEntityAttribute.AttributeValueType.STRING,
             createdAt = now,
             payload = EMPTY_JSON_PAYLOAD
@@ -37,15 +34,14 @@ class TemporalEntityBuilderTests {
             temporalEntityAttribute to emptyList<AttributeInstanceResult>()
         )
         val entityPayload = EntityPayload(
-            entityId = "urn:ngsi-ld:Subscription:1234".toUri(),
-            types = listOf(NGSILD_SUBSCRIPTION_PROPERTY),
+            entityId = "urn:ngsi-ld:Beehive:1234".toUri(),
+            types = listOf(BEEHIVE_TYPE),
             createdAt = now,
             payload = EMPTY_JSON_PAYLOAD,
-            contexts = listOf(NGSILD_CORE_CONTEXT)
+            contexts = listOf(APIC_COMPOUND_CONTEXT)
         )
         val temporalEntity = TemporalEntityBuilder.buildTemporalEntity(
-            entityPayload,
-            attributeAndResultsMap,
+            EntityTemporalResult(entityPayload, emptyList(), attributeAndResultsMap),
             TemporalEntitiesQuery(
                 queryParams = buildDefaultQueryParams(),
                 temporalQuery = TemporalQuery(),
@@ -53,18 +49,18 @@ class TemporalEntityBuilderTests {
                 withAudit = false,
                 withAggregatedValues = false
             ),
-            listOf(NGSILD_CORE_CONTEXT)
+            listOf(APIC_COMPOUND_CONTEXT)
         )
-        assertTrue(
-            serializeObject(temporalEntity).matchContent(
-                loadSampleData("expectations/subscription_empty_notification.jsonld")
-            )
+        assertJsonPayloadsAreEqual(
+            loadSampleData("expectations/beehive_empty_outgoing.jsonld"),
+            serializeObject(temporalEntity)
         )
     }
 
     @ParameterizedTest
     @MethodSource("com.egm.stellio.search.util.ParameterizedTests#rawResultsProvider")
     fun `it should correctly build a temporal entity`(
+        scopeHistory: List<ScopeInstanceResult>,
         attributeAndResultsMap: TemporalEntityAttributeInstancesResult,
         withTemporalValues: Boolean,
         withAudit: Boolean,
@@ -79,8 +75,7 @@ class TemporalEntityBuilderTests {
         )
 
         val temporalEntity = TemporalEntityBuilder.buildTemporalEntity(
-            entityPayload,
-            attributeAndResultsMap,
+            EntityTemporalResult(entityPayload, scopeHistory, attributeAndResultsMap),
             TemporalEntitiesQuery(
                 queryParams = buildDefaultQueryParams(),
                 temporalQuery = TemporalQuery(),
@@ -96,13 +91,13 @@ class TemporalEntityBuilderTests {
     @ParameterizedTest
     @MethodSource("com.egm.stellio.search.util.QueryParameterizedTests#rawResultsProvider")
     fun `it should correctly build temporal entities`(
-        queryResult: List<Pair<EntityPayload, TemporalEntityAttributeInstancesResult>>,
+        entityTemporalResults: List<EntityTemporalResult>,
         withTemporalValues: Boolean,
         withAudit: Boolean,
         expectation: String
     ) {
         val temporalEntity = TemporalEntityBuilder.buildTemporalEntities(
-            queryResult,
+            entityTemporalResults,
             TemporalEntitiesQuery(
                 queryParams = buildDefaultQueryParams(),
                 temporalQuery = TemporalQuery(),
@@ -118,8 +113,8 @@ class TemporalEntityBuilderTests {
     @Test
     fun `it should return a temporal entity with values aggregated`() {
         val temporalEntityAttribute = TemporalEntityAttribute(
-            entityId = "urn:ngsi-ld:Subscription:1234".toUri(),
-            attributeName = NGSILD_NOTIFICATION_ATTR_PROPERTY,
+            entityId = "urn:ngsi-ld:Beehive:1234".toUri(),
+            attributeName = OUTGOING_PROPERTY,
             attributeValueType = TemporalEntityAttribute.AttributeValueType.NUMBER,
             createdAt = now,
             payload = EMPTY_JSON_PAYLOAD
@@ -170,16 +165,15 @@ class TemporalEntityBuilderTests {
             listOf(TemporalQuery.Aggregate.SUM, TemporalQuery.Aggregate.AVG)
         )
         val entityPayload = EntityPayload(
-            entityId = "urn:ngsi-ld:Subscription:1234".toUri(),
-            types = listOf(NGSILD_SUBSCRIPTION_PROPERTY),
+            entityId = "urn:ngsi-ld:Beehive:1234".toUri(),
+            types = listOf(BEEHIVE_TYPE),
             createdAt = now,
             payload = EMPTY_JSON_PAYLOAD,
-            contexts = listOf(NGSILD_CORE_CONTEXT)
+            contexts = listOf(APIC_COMPOUND_CONTEXT)
         )
 
         val temporalEntity = TemporalEntityBuilder.buildTemporalEntity(
-            entityPayload,
-            attributeAndResultsMap,
+            EntityTemporalResult(entityPayload, emptyList(), attributeAndResultsMap),
             TemporalEntitiesQuery(
                 queryParams = buildDefaultQueryParams(),
                 temporalQuery = temporalQuery,
@@ -187,11 +181,11 @@ class TemporalEntityBuilderTests {
                 withAudit = false,
                 withAggregatedValues = true
             ),
-            listOf(NGSILD_CORE_CONTEXT)
+            listOf(APIC_COMPOUND_CONTEXT)
         )
 
         assertJsonPayloadsAreEqual(
-            loadSampleData("expectations/subscription_with_notifications_aggregated.jsonld"),
+            loadSampleData("expectations/beehive_aggregated_outgoing.jsonld"),
             serializeObject(temporalEntity)
         )
     }

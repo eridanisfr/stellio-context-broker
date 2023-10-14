@@ -1,24 +1,23 @@
 package com.egm.stellio.search.web
 
-import arrow.core.continuations.either
+import arrow.core.getOrElse
 import arrow.core.left
+import arrow.core.raise.either
 import arrow.core.right
 import com.egm.stellio.search.authorization.AuthorizationService
-import com.egm.stellio.search.config.ApplicationProperties
 import com.egm.stellio.search.model.hasSuccessfulUpdate
 import com.egm.stellio.search.service.EntityEventService
 import com.egm.stellio.search.service.EntityPayloadService
 import com.egm.stellio.search.service.QueryService
-import com.egm.stellio.search.service.TemporalEntityAttributeService
+import com.egm.stellio.shared.config.ApplicationProperties
 import com.egm.stellio.shared.model.*
 import com.egm.stellio.shared.util.*
 import com.egm.stellio.shared.util.JsonLdUtils.expandAttribute
 import com.egm.stellio.shared.util.JsonLdUtils.expandAttributes
 import com.egm.stellio.shared.util.JsonLdUtils.expandJsonLdEntity
 import com.egm.stellio.shared.util.JsonLdUtils.removeContextFromInput
-import com.egm.stellio.shared.util.JsonUtils.deserializeAsMap
 import com.egm.stellio.shared.util.JsonUtils.serializeObject
-import kotlinx.coroutines.reactive.awaitFirst
+import com.egm.stellio.shared.web.BaseHandler
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
@@ -34,11 +33,10 @@ import java.util.Optional
 class EntityHandler(
     private val applicationProperties: ApplicationProperties,
     private val entityPayloadService: EntityPayloadService,
-    private val temporalEntityAttributeService: TemporalEntityAttributeService,
     private val queryService: QueryService,
     private val authorizationService: AuthorizationService,
     private val entityEventService: EntityEventService
-) {
+) : BaseHandler() {
 
     /**
      * Implements 6.4.3.1 - Create Entity
@@ -49,11 +47,7 @@ class EntityHandler(
         @RequestBody requestBody: Mono<String>
     ): ResponseEntity<*> = either {
         val sub = getSubFromSecurityContext()
-        val body = requestBody.awaitFirst().deserializeAsMap()
-            .checkNamesAreNgsiLdSupported().bind()
-            .checkContentIsNgsiLdSupported().bind()
-
-        val contexts = checkAndGetContext(httpHeaders, body).bind()
+        val (body, contexts) = extractPayloadAndContexts(requestBody, httpHeaders).bind()
         val jsonLdEntity = expandJsonLdEntity(body, contexts)
         val ngsiLdEntity = jsonLdEntity.toNgsiLdEntity().bind()
 
@@ -63,12 +57,12 @@ class EntityHandler(
         entityPayloadService.createEntity(
             ngsiLdEntity,
             jsonLdEntity,
-            sub.orNull()
+            sub.getOrNull()
         ).bind()
         authorizationService.createAdminRight(ngsiLdEntity.id, sub).bind()
 
         entityEventService.publishEntityCreateEvent(
-            sub.orNull(),
+            sub.getOrNull(),
             ngsiLdEntity.id,
             ngsiLdEntity.types,
             contexts
@@ -81,6 +75,106 @@ class EntityHandler(
         { it.toErrorResponse() },
         { it }
     )
+
+    /**
+     * Implements 6.5.3.4 - Merge Entity
+     */
+    @PatchMapping("/{entityId}", consumes = [MediaType.APPLICATION_JSON_VALUE, JSON_LD_CONTENT_TYPE])
+    suspend fun merge(
+        @RequestHeader httpHeaders: HttpHeaders,
+        @PathVariable entityId: URI,
+        @RequestParam options: MultiValueMap<String, String>,
+        @RequestBody requestBody: Mono<String>
+    ): ResponseEntity<*> = either {
+        val sub = getSubFromSecurityContext()
+
+        entityPayloadService.checkEntityExistence(entityId).bind()
+        authorizationService.userCanUpdateEntity(entityId, sub).bind()
+
+        val (body, contexts) = extractPayloadAndContexts(requestBody, httpHeaders).bind()
+
+        val observedAt = options.getFirst(QUERY_PARAM_OPTIONS_OBSERVEDAT_VALUE)
+            ?.parseTimeParameter("'observedAt' parameter is not a valid date")
+            ?.getOrElse { return@either BadRequestDataException(it).left().bind<ResponseEntity<*>>() }
+
+        val expandedAttributes = expandAttributes(body, contexts)
+
+        val updateResult = entityPayloadService.mergeEntity(
+            entityId,
+            expandedAttributes,
+            observedAt,
+            sub.getOrNull()
+        ).bind()
+
+        if (updateResult.updated.isNotEmpty()) {
+            entityEventService.publishAttributeChangeEvents(
+                sub.getOrNull(),
+                entityId,
+                expandedAttributes,
+                updateResult,
+                true,
+                contexts
+            )
+        }
+
+        if (updateResult.notUpdated.isEmpty())
+            ResponseEntity.status(HttpStatus.NO_CONTENT).build<String>()
+        else
+            ResponseEntity.status(HttpStatus.MULTI_STATUS).body(updateResult)
+    }.fold(
+        { it.toErrorResponse() },
+        { it }
+    )
+
+    @PatchMapping("/", "")
+    fun handleMissingEntityIdOnMerge(): ResponseEntity<*> =
+        missingPathErrorResponse("Missing entity id when trying to merge an entity")
+
+    /**
+     * Implements 6.5.3.3 - Replace Entity
+     */
+    @PutMapping("/{entityId}", consumes = [MediaType.APPLICATION_JSON_VALUE, JSON_LD_CONTENT_TYPE])
+    suspend fun replace(
+        @RequestHeader httpHeaders: HttpHeaders,
+        @PathVariable entityId: URI,
+        @RequestBody requestBody: Mono<String>
+    ): ResponseEntity<*> = either {
+        val sub = getSubFromSecurityContext()
+        val (body, contexts) = extractPayloadAndContexts(requestBody, httpHeaders).bind()
+
+        val jsonLdEntity = expandJsonLdEntity(body, contexts)
+        val ngsiLdEntity = jsonLdEntity.toNgsiLdEntity().bind()
+
+        entityPayloadService.checkEntityExistence(entityId).bind()
+        authorizationService.userCanUpdateEntity(entityId, sub).bind()
+
+        if (ngsiLdEntity.id != entityId)
+            BadRequestDataException("The id contained in the body is not the same as the one provided in the URL")
+                .left().bind<ResponseEntity<*>>()
+
+        entityPayloadService.replaceEntity(
+            entityId,
+            ngsiLdEntity,
+            jsonLdEntity,
+            sub.getOrNull()
+        ).bind()
+
+        entityEventService.publishEntityReplaceEvent(
+            sub.getOrNull(),
+            ngsiLdEntity.id,
+            ngsiLdEntity.types,
+            contexts
+        )
+
+        ResponseEntity.status(HttpStatus.NO_CONTENT).build<String>()
+    }.fold(
+        { it.toErrorResponse() },
+        { it }
+    )
+
+    @PutMapping("/", "")
+    fun handleMissingEntityIdOnReplace(): ResponseEntity<*> =
+        missingPathErrorResponse("Missing entity id when trying to replace an entity")
 
     /**
      * Implements 6.4.3.2 - Query Entities
@@ -107,7 +201,7 @@ class EntityHandler(
             queryParams.attrs.isEmpty()
         )
             BadRequestDataException(
-                "one of 'id', 'q', 'type' and 'attrs' request parameters have to be specified"
+                "one of 'ids', 'q', 'type' and 'attrs' request parameters have to be specified"
             ).left().bind<ResponseEntity<*>>()
 
         val accessRightFilter = authorizationService.computeAccessRightFilter(sub)
@@ -153,10 +247,9 @@ class EntityHandler(
     @GetMapping("/{entityId}", produces = [MediaType.APPLICATION_JSON_VALUE, JSON_LD_CONTENT_TYPE])
     suspend fun getByURI(
         @RequestHeader httpHeaders: HttpHeaders,
-        @PathVariable entityId: String,
+        @PathVariable entityId: URI,
         @RequestParam params: MultiValueMap<String, String>
     ): ResponseEntity<*> = either {
-        val entityUri = entityId.toUri()
         val mediaType = getApplicableMediaType(httpHeaders)
         val sub = getSubFromSecurityContext()
 
@@ -167,11 +260,11 @@ class EntityHandler(
             contextLink
         ).bind()
 
-        entityPayloadService.checkEntityExistence(entityUri).bind()
+        entityPayloadService.checkEntityExistence(entityId).bind()
 
-        authorizationService.userCanReadEntity(entityUri, sub).bind()
+        authorizationService.userCanReadEntity(entityId, sub).bind()
 
-        val jsonLdEntity = queryService.queryEntity(entityUri, listOf(contextLink)).bind()
+        val jsonLdEntity = queryService.queryEntity(entityId, listOf(contextLink)).bind()
 
         jsonLdEntity.checkContainsAnyOf(queryParams.attrs).bind()
 
@@ -199,20 +292,19 @@ class EntityHandler(
      */
     @DeleteMapping("/{entityId}")
     suspend fun delete(
-        @PathVariable entityId: String
+        @PathVariable entityId: URI
     ): ResponseEntity<*> = either {
-        val entityUri = entityId.toUri()
         val sub = getSubFromSecurityContext()
 
-        entityPayloadService.checkEntityExistence(entityUri).bind()
+        entityPayloadService.checkEntityExistence(entityId).bind()
         // Is there a way to avoid loading the entity to get its type and contexts (for the event to be published)?
-        val entity = entityPayloadService.retrieve(entityId.toUri()).bind()
-        authorizationService.userCanAdminEntity(entityUri, sub).bind()
+        val entity = entityPayloadService.retrieve(entityId).bind()
+        authorizationService.userCanAdminEntity(entityId, sub).bind()
 
-        entityPayloadService.deleteEntityPayload(entityUri).bind()
-        authorizationService.removeRightsOnEntity(entityUri).bind()
+        entityPayloadService.deleteEntity(entityId).bind()
+        authorizationService.removeRightsOnEntity(entityId).bind()
 
-        entityEventService.publishEntityDeleteEvent(sub.orNull(), entityId.toUri(), entity.types, entity.contexts)
+        entityEventService.publishEntityDeleteEvent(sub.getOrNull(), entityId, entity.types, entity.contexts)
 
         ResponseEntity.status(HttpStatus.NO_CONTENT).build<String>()
     }.fold(
@@ -221,7 +313,7 @@ class EntityHandler(
     )
 
     @DeleteMapping("/", "")
-    suspend fun handleMissingEntityIdOnDelete(): ResponseEntity<*> =
+    fun handleMissingEntityIdOnDelete(): ResponseEntity<*> =
         missingPathErrorResponse("Missing entity id when trying to delete an entity")
 
     /**
@@ -231,44 +323,31 @@ class EntityHandler(
     @PostMapping("/{entityId}/attrs", consumes = [MediaType.APPLICATION_JSON_VALUE, JSON_LD_CONTENT_TYPE])
     suspend fun appendEntityAttributes(
         @RequestHeader httpHeaders: HttpHeaders,
-        @PathVariable entityId: String,
+        @PathVariable entityId: URI,
         @RequestParam options: Optional<String>,
         @RequestBody requestBody: Mono<String>
     ): ResponseEntity<*> = either {
         val sub = getSubFromSecurityContext()
-        val entityUri = entityId.toUri()
         val disallowOverwrite = options.map { it == QUERY_PARAM_OPTIONS_NOOVERWRITE_VALUE }.orElse(false)
 
-        entityPayloadService.checkEntityExistence(entityUri).bind()
+        entityPayloadService.checkEntityExistence(entityId).bind()
 
-        val body = requestBody.awaitFirst().deserializeAsMap()
-            .checkNamesAreNgsiLdSupported().bind()
-            .checkContentIsNgsiLdSupported().bind()
-
-        val contexts = checkAndGetContext(httpHeaders, body).bind()
+        val (body, contexts) = extractPayloadAndContexts(requestBody, httpHeaders).bind()
         val expandedAttributes = expandAttributes(body, contexts)
-        val (typeAttr, otherAttrs) = expandedAttributes.toList().partition { it.first == JsonLdUtils.JSONLD_TYPE }
-        val ngsiLdAttributes = otherAttrs.toMap().toNgsiLdAttributes().bind()
 
-        authorizationService.userCanUpdateEntity(entityUri, sub).bind()
+        authorizationService.userCanUpdateEntity(entityId, sub).bind()
 
-        val updateResult = entityPayloadService.updateTypes(
-            entityUri,
-            typeAttr.map { it.second as List<ExpandedTerm> }.firstOrNull().orEmpty()
-        ).bind().mergeWith(
-            entityPayloadService.appendAttributes(
-                entityUri,
-                ngsiLdAttributes,
-                expandedAttributes,
-                disallowOverwrite,
-                sub.orNull()
-            ).bind()
-        )
+        val updateResult = entityPayloadService.appendAttributes(
+            entityId,
+            expandedAttributes,
+            disallowOverwrite,
+            sub.getOrNull()
+        ).bind()
 
         if (updateResult.hasSuccessfulUpdate()) {
             entityEventService.publishAttributeChangeEvents(
-                sub.orNull(),
-                entityUri,
+                sub.getOrNull(),
+                entityId,
                 expandedAttributes,
                 updateResult,
                 true,
@@ -286,7 +365,7 @@ class EntityHandler(
     )
 
     @PostMapping("/attrs")
-    suspend fun handleMissingEntityIdOnAttributeAppend(): ResponseEntity<*> =
+    fun handleMissingEntityIdOnAttributeAppend(): ResponseEntity<*> =
         missingPathErrorResponse("Missing entity id when trying to append attribute")
 
     /**
@@ -299,39 +378,26 @@ class EntityHandler(
     )
     suspend fun updateEntityAttributes(
         @RequestHeader httpHeaders: HttpHeaders,
-        @PathVariable entityId: String,
+        @PathVariable entityId: URI,
         @RequestBody requestBody: Mono<String>
     ): ResponseEntity<*> = either {
         val sub = getSubFromSecurityContext()
-        val entityUri = entityId.toUri()
-        val body = requestBody.awaitFirst().deserializeAsMap()
-            .checkNamesAreNgsiLdSupported().bind()
-            .checkContentIsNgsiLdSupported().bind()
-        val contexts = checkAndGetContext(httpHeaders, body).bind()
+        val (body, contexts) = extractPayloadAndContexts(requestBody, httpHeaders).bind()
         val expandedAttributes = expandAttributes(body, contexts)
-        val (typeAttr, otherAttrs) = expandedAttributes.toList().partition { it.first == JsonLdUtils.JSONLD_TYPE }
-        val ngsiLdAttributes = otherAttrs.toMap().toNgsiLdAttributes().bind()
 
-        entityPayloadService.checkEntityExistence(entityUri).bind()
+        entityPayloadService.checkEntityExistence(entityId).bind()
+        authorizationService.userCanUpdateEntity(entityId, sub).bind()
 
-        authorizationService.userCanUpdateEntity(entityUri, sub).bind()
-
-        val updateResult = entityPayloadService.updateTypes(
-            entityUri,
-            typeAttr.map { it.second as List<ExpandedTerm> }.firstOrNull().orEmpty()
-        ).bind().mergeWith(
-            entityPayloadService.updateAttributes(
-                entityUri,
-                ngsiLdAttributes,
-                expandedAttributes,
-                sub.orNull()
-            ).bind()
-        )
+        val updateResult = entityPayloadService.updateAttributes(
+            entityId,
+            expandedAttributes,
+            sub.getOrNull()
+        ).bind()
 
         if (updateResult.updated.isNotEmpty()) {
             entityEventService.publishAttributeChangeEvents(
-                sub.orNull(),
-                entityUri,
+                sub.getOrNull(),
+                entityId,
                 expandedAttributes,
                 updateResult,
                 true,
@@ -349,7 +415,7 @@ class EntityHandler(
     )
 
     @PatchMapping("/attrs")
-    suspend fun handleMissingAttributeOnAttributeUpdate(): ResponseEntity<*> =
+    fun handleMissingAttributeOnAttributeUpdate(): ResponseEntity<*> =
         missingPathErrorResponse("Missing attribute id when trying to update an attribute")
 
     /**
@@ -362,28 +428,24 @@ class EntityHandler(
     )
     suspend fun partialAttributeUpdate(
         @RequestHeader httpHeaders: HttpHeaders,
-        @PathVariable entityId: String,
+        @PathVariable entityId: URI,
         @PathVariable attrId: String,
         @RequestBody requestBody: Mono<String>
     ): ResponseEntity<*> = either {
         val sub = getSubFromSecurityContext()
-        val entityUri = entityId.toUri()
 
-        entityPayloadService.checkEntityExistence(entityUri).bind()
-        authorizationService.userCanUpdateEntity(entityUri, sub).bind()
+        entityPayloadService.checkEntityExistence(entityId).bind()
+        authorizationService.userCanUpdateEntity(entityId, sub).bind()
 
         // We expect an NGSI-LD Attribute Fragment which should be a JSON-LD Object (see 5.4)
-        val body = requestBody.awaitFirst().deserializeAsMap()
-            .checkNamesAreNgsiLdSupported().bind()
-            .checkContentIsNgsiLdSupported().bind()
-        val contexts = checkAndGetContext(httpHeaders, body).bind()
+        val (body, contexts) = extractPayloadAndContexts(requestBody, httpHeaders).bind()
 
         val expandedAttribute = expandAttribute(attrId, removeContextFromInput(body), contexts)
 
         entityPayloadService.partialUpdateAttribute(
-            entityUri,
+            entityId,
             expandedAttribute,
-            sub.orNull()
+            sub.getOrNull()
         )
             .bind()
             .let {
@@ -391,8 +453,8 @@ class EntityHandler(
                     ResourceNotFoundException("Unknown attribute in entity $entityId").left()
                 else {
                     entityEventService.publishAttributeChangeEvents(
-                        sub.orNull(),
-                        entityUri,
+                        sub.getOrNull(),
+                        entityId,
                         expandedAttribute.toExpandedAttributes(),
                         it,
                         false,
@@ -408,7 +470,7 @@ class EntityHandler(
     )
 
     @PatchMapping("/attrs/{attrId}")
-    suspend fun handleMissingAttributeOnPartialAttributeUpdate(): ResponseEntity<*> =
+    fun handleMissingAttributeOnPartialAttributeUpdate(): ResponseEntity<*> =
         missingPathErrorResponse("Missing attribute id when trying to partially update an attribute")
 
     /**
@@ -417,36 +479,29 @@ class EntityHandler(
     @DeleteMapping("/{entityId}/attrs/{attrId}")
     suspend fun deleteEntityAttribute(
         @RequestHeader httpHeaders: HttpHeaders,
-        @PathVariable entityId: String,
+        @PathVariable entityId: URI,
         @PathVariable attrId: String,
         @RequestParam params: MultiValueMap<String, String>
     ): ResponseEntity<*> = either {
         val sub = getSubFromSecurityContext()
-        val entityUri = entityId.toUri()
         val deleteAll = params.getFirst("deleteAll")?.toBoolean() ?: false
         val datasetId = params.getFirst("datasetId")?.toUri()
 
         val contexts = listOf(getContextFromLinkHeaderOrDefault(httpHeaders).bind())
         val expandedAttrId = JsonLdUtils.expandJsonLdTerm(attrId, contexts)
 
-        temporalEntityAttributeService.checkEntityAndAttributeExistence(
-            entityUri,
-            expandedAttrId,
-            datasetId
-        ).bind()
-
-        authorizationService.userCanUpdateEntity(entityUri, sub).bind()
+        authorizationService.userCanUpdateEntity(entityId, sub).bind()
 
         entityPayloadService.deleteAttribute(
-            entityUri,
+            entityId,
             expandedAttrId,
             datasetId,
             deleteAll
         ).bind()
 
         entityEventService.publishAttributeDeleteEvent(
-            sub.orNull(),
-            entityUri,
+            sub.getOrNull(),
+            entityId,
             expandedAttrId,
             datasetId,
             deleteAll,
@@ -459,6 +514,46 @@ class EntityHandler(
     )
 
     @DeleteMapping("/attrs/{attrId}", "/{entityId}/attrs")
-    suspend fun handleMissingEntityIdOrAttributeOnDeleteAttribute(): ResponseEntity<*> =
+    fun handleMissingEntityIdOrAttributeOnDeleteAttribute(): ResponseEntity<*> =
         missingPathErrorResponse("Missing entity id or attribute id when trying to delete an attribute")
+
+    /**
+     * Implements 6.7.3.3 - Replace Attribute
+     */
+    @PutMapping("/{entityId}/attrs/{attrId}")
+    suspend fun replaceEntityAttribute(
+        @RequestHeader httpHeaders: HttpHeaders,
+        @PathVariable entityId: URI,
+        @PathVariable attrId: String,
+        @RequestBody requestBody: Mono<String>
+    ): ResponseEntity<*> = either {
+        val sub = getSubFromSecurityContext()
+        val (body, contexts) = extractPayloadAndContexts(requestBody, httpHeaders).bind()
+
+        entityPayloadService.checkEntityExistence(entityId).bind()
+        authorizationService.userCanUpdateEntity(entityId, sub).bind()
+
+        val expandedAttribute = expandAttribute(attrId, removeContextFromInput(body), contexts)
+
+        entityPayloadService.replaceAttribute(entityId, expandedAttribute, sub.getOrNull()).bind()
+            .let {
+                if (it.updated.isEmpty())
+                    ResourceNotFoundException(it.notUpdated[0].reason).left()
+                else {
+                    entityEventService.publishAttributeChangeEvents(
+                        sub.getOrNull(),
+                        entityId,
+                        expandedAttribute.toExpandedAttributes(),
+                        it,
+                        false,
+                        contexts
+                    )
+
+                    ResponseEntity.status(HttpStatus.NO_CONTENT).build<String>().right()
+                }
+            }.bind()
+    }.fold(
+        { it.toErrorResponse() },
+        { it }
+    )
 }

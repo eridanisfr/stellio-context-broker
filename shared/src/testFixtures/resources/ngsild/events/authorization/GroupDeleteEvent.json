@@ -1,9 +1,10 @@
 {
   "operationType": "ENTITY_DELETE",
+  "tenantUri": "urn:ngsi-ld:tenant:default",
   "entityId": "urn:ngsi-ld:Group:a11c00f9-43bc-47a8-9d23-13d67696bdb8",
   "entityTypes": ["Group"],
   "contexts": [
     "https://raw.githubusercontent.com/easy-global-market/ngsild-api-data-models/master/authorization/jsonld-contexts/authorization.jsonld",
-    "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context-v1.3.jsonld"
+    "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context-v1.7.jsonld"
   ]
 }

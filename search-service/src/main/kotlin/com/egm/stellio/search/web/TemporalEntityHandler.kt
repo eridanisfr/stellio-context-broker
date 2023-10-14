@@ -1,10 +1,10 @@
 package com.egm.stellio.search.web
 
-import arrow.core.continuations.either
+import arrow.core.raise.either
 import com.egm.stellio.search.authorization.AuthorizationService
-import com.egm.stellio.search.config.ApplicationProperties
 import com.egm.stellio.search.service.*
 import com.egm.stellio.search.util.parseQueryAndTemporalParams
+import com.egm.stellio.shared.config.ApplicationProperties
 import com.egm.stellio.shared.model.*
 import com.egm.stellio.shared.util.*
 import com.egm.stellio.shared.util.JsonLdUtils.addContextsToEntity
@@ -12,8 +12,8 @@ import com.egm.stellio.shared.util.JsonLdUtils.expandAttribute
 import com.egm.stellio.shared.util.JsonLdUtils.expandAttributes
 import com.egm.stellio.shared.util.JsonLdUtils.expandJsonLdEntity
 import com.egm.stellio.shared.util.JsonUtils.deserializeAsList
-import com.egm.stellio.shared.util.JsonUtils.deserializeAsMap
 import com.egm.stellio.shared.util.JsonUtils.serializeObject
+import com.egm.stellio.shared.web.BaseHandler
 import kotlinx.coroutines.reactive.awaitFirst
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
@@ -33,7 +33,7 @@ class TemporalEntityHandler(
     private val queryService: QueryService,
     private val authorizationService: AuthorizationService,
     private val applicationProperties: ApplicationProperties
-) {
+) : BaseHandler() {
 
     /**
      * Implements 6.18.3.1 - Create or Update (Upsert) Temporal Representation of Entity
@@ -44,10 +44,7 @@ class TemporalEntityHandler(
         @RequestBody requestBody: Mono<String>
     ): ResponseEntity<*> = either {
         val sub = getSubFromSecurityContext()
-        val body = requestBody.awaitFirst().deserializeAsMap()
-            .checkNamesAreNgsiLdSupported().bind()
-            .checkContentIsNgsiLdSupported().bind()
-        val contexts = checkAndGetContext(httpHeaders, body).bind()
+        val (body, contexts) = extractPayloadAndContexts(requestBody, httpHeaders).bind()
 
         val jsonLdTemporalEntity = expandJsonLdEntity(body, contexts)
         val entityUri = jsonLdTemporalEntity.id.toUri()
@@ -69,11 +66,11 @@ class TemporalEntityHandler(
             )
             val ngsiLdEntity = jsonLdEntity.toNgsiLdEntity().bind()
 
-            entityPayloadService.createEntity(ngsiLdEntity, jsonLdEntity, sub.orNull()).bind()
+            entityPayloadService.createEntity(ngsiLdEntity, jsonLdEntity, sub.getOrNull()).bind()
             entityPayloadService.upsertAttributes(
                 entityUri,
                 sortedJsonLdInstances.removeFirstInstances(),
-                sub.orNull()
+                sub.getOrNull()
             ).bind()
             authorizationService.createAdminRight(entityUri, sub).bind()
 
@@ -85,7 +82,7 @@ class TemporalEntityHandler(
             entityPayloadService.upsertAttributes(
                 entityUri,
                 sortedJsonLdInstances,
-                sub.orNull()
+                sub.getOrNull()
             ).bind()
 
             ResponseEntity.status(HttpStatus.NO_CONTENT).build()
@@ -101,27 +98,23 @@ class TemporalEntityHandler(
     @PostMapping("/{entityId}/attrs", consumes = [MediaType.APPLICATION_JSON_VALUE, JSON_LD_CONTENT_TYPE])
     suspend fun addAttributes(
         @RequestHeader httpHeaders: HttpHeaders,
-        @PathVariable entityId: String,
+        @PathVariable entityId: URI,
         @RequestBody requestBody: Mono<String>
     ): ResponseEntity<*> = either {
         val sub = getSubFromSecurityContext()
-        val entityUri = entityId.toUri()
 
-        entityPayloadService.checkEntityExistence(entityUri).bind()
-        authorizationService.userCanUpdateEntity(entityUri, sub).bind()
+        entityPayloadService.checkEntityExistence(entityId).bind()
+        authorizationService.userCanUpdateEntity(entityId, sub).bind()
 
-        val body = requestBody.awaitFirst().deserializeAsMap()
-            .checkNamesAreNgsiLdSupported().bind()
-            .checkContentIsNgsiLdSupported().bind()
-        val contexts = checkAndGetContext(httpHeaders, body).bind()
+        val (body, contexts) = extractPayloadAndContexts(requestBody, httpHeaders).bind()
         val jsonLdInstances = expandAttributes(body, contexts)
         jsonLdInstances.checkTemporalAttributeInstance().bind()
         val sortedJsonLdInstances = jsonLdInstances.sorted()
 
         entityPayloadService.upsertAttributes(
-            entityUri,
+            entityId,
             sortedJsonLdInstances,
-            sub.orNull()
+            sub.getOrNull()
         ).bind()
 
         ResponseEntity.status(HttpStatus.NO_CONTENT).build<String>()
@@ -131,7 +124,7 @@ class TemporalEntityHandler(
     )
 
     @PostMapping("/attrs")
-    suspend fun handleMissingEntityIdOnAttributeAppend(): ResponseEntity<*> =
+    fun handleMissingEntityIdOnAttributeAppend(): ResponseEntity<*> =
         missingPathErrorResponse("Missing entity id when trying to append attribute")
 
     /**
@@ -175,24 +168,23 @@ class TemporalEntityHandler(
     @GetMapping("/{entityId}", produces = [MediaType.APPLICATION_JSON_VALUE, JSON_LD_CONTENT_TYPE])
     suspend fun getForEntity(
         @RequestHeader httpHeaders: HttpHeaders,
-        @PathVariable entityId: String,
+        @PathVariable entityId: URI,
         @RequestParam requestParams: MultiValueMap<String, String>
     ): ResponseEntity<*> = either {
         val sub = getSubFromSecurityContext()
-        val entityUri = entityId.toUri()
 
-        entityPayloadService.checkEntityExistence(entityUri).bind()
+        entityPayloadService.checkEntityExistence(entityId).bind()
 
         val contextLink = getContextFromLinkHeaderOrDefault(httpHeaders).bind()
         val mediaType = getApplicableMediaType(httpHeaders)
 
-        authorizationService.userCanReadEntity(entityUri, sub).bind()
+        authorizationService.userCanReadEntity(entityId, sub).bind()
 
         val temporalEntitiesQuery =
             parseQueryAndTemporalParams(applicationProperties.pagination, requestParams, contextLink).bind()
 
         val temporalEntity = queryService.queryTemporalEntity(
-            entityUri,
+            entityId,
             temporalEntitiesQuery,
             contextLink
         ).bind()
@@ -214,7 +206,7 @@ class TemporalEntityHandler(
     )
     suspend fun modifyAttributeInstanceTemporal(
         @RequestHeader httpHeaders: HttpHeaders,
-        @PathVariable entityId: String,
+        @PathVariable entityId: URI,
         @PathVariable attrId: String,
         @PathVariable instanceId: String,
         @RequestBody requestBody: Mono<String>
@@ -224,18 +216,17 @@ class TemporalEntityHandler(
             .checkNamesAreNgsiLdSupported().bind()
             .checkContentIsNgsiLdSupported().bind()
         val contexts = checkAndGetContext(httpHeaders, body).bind()
-        val entityUri = entityId.toUri()
         val instanceUri = instanceId.toUri()
         attrId.checkNameIsNgsiLdSupported().bind()
 
-        entityPayloadService.checkEntityExistence(entityUri).bind()
-        authorizationService.userCanUpdateEntity(entityUri, sub).bind()
+        entityPayloadService.checkEntityExistence(entityId).bind()
+        authorizationService.userCanUpdateEntity(entityId, sub).bind()
 
         val expandedAttribute = expandAttribute(attrId, JsonLdUtils.removeContextFromInput(body), contexts)
         expandedAttribute.toExpandedAttributes().checkTemporalAttributeInstance().bind()
 
         attributeInstanceService.modifyAttributeInstance(
-            entityUri,
+            entityId,
             expandedAttribute.first,
             instanceUri,
             expandedAttribute.second
@@ -254,7 +245,7 @@ class TemporalEntityHandler(
         "/{entityId}/attrs",
         "/attrs"
     )
-    suspend fun handleMissingParametersOnModifyInstanceTemporal(): ResponseEntity<*> =
+    fun handleMissingParametersOnModifyInstanceTemporal(): ResponseEntity<*> =
         missingPathErrorResponse(
             "Missing some parameter(entity id, attribute id, instance id) when trying to modify temporal entity"
         )
@@ -264,15 +255,14 @@ class TemporalEntityHandler(
      */
     @DeleteMapping("/{entityId}")
     suspend fun deleteTemporalEntity(
-        @PathVariable entityId: String
+        @PathVariable entityId: URI
     ): ResponseEntity<*> = either {
-        val entityUri = entityId.toUri()
         val sub = getSubFromSecurityContext()
 
-        entityPayloadService.checkEntityExistence(entityUri).bind()
-        authorizationService.userCanAdminEntity(entityUri, sub).bind()
-        entityPayloadService.deleteEntityPayload(entityUri).bind()
-        authorizationService.removeRightsOnEntity(entityUri).bind()
+        entityPayloadService.checkEntityExistence(entityId).bind()
+        authorizationService.userCanAdminEntity(entityId, sub).bind()
+        entityPayloadService.deleteEntity(entityId).bind()
+        authorizationService.removeRightsOnEntity(entityId).bind()
 
         ResponseEntity.status(HttpStatus.NO_CONTENT).build<String>()
     }.fold(
@@ -281,7 +271,7 @@ class TemporalEntityHandler(
     )
 
     @DeleteMapping("/", "")
-    suspend fun handleMissingEntityIdOnDeleteTemporalEntity(): ResponseEntity<*> =
+    fun handleMissingEntityIdOnDeleteTemporalEntity(): ResponseEntity<*> =
         missingPathErrorResponse("Missing entity id when trying to delete temporal entity")
 
     /**
@@ -290,12 +280,11 @@ class TemporalEntityHandler(
     @DeleteMapping("/{entityId}/attrs/{attrId}")
     suspend fun deleteAttributeTemporal(
         @RequestHeader httpHeaders: HttpHeaders,
-        @PathVariable entityId: String,
+        @PathVariable entityId: URI,
         @PathVariable attrId: String,
         @RequestParam params: MultiValueMap<String, String>
     ): ResponseEntity<*> = either {
         val sub = getSubFromSecurityContext()
-        val entityUri = entityId.toUri()
         val deleteAll = params.getFirst("deleteAll")?.toBoolean() ?: false
         val datasetId = params.getFirst("datasetId")?.toUri()
 
@@ -304,15 +293,15 @@ class TemporalEntityHandler(
         val expandedAttrId = JsonLdUtils.expandJsonLdTerm(attrId, contexts)
 
         temporalEntityAttributeService.checkEntityAndAttributeExistence(
-            entityUri,
+            entityId,
             expandedAttrId,
             datasetId
         ).bind()
 
-        authorizationService.userCanUpdateEntity(entityUri, sub).bind()
+        authorizationService.userCanUpdateEntity(entityId, sub).bind()
 
         entityPayloadService.deleteAttribute(
-            entityUri,
+            entityId,
             expandedAttrId,
             datasetId,
             deleteAll
@@ -325,7 +314,7 @@ class TemporalEntityHandler(
     )
 
     @DeleteMapping("/attrs/{attrId}", "/{entityId}/attrs")
-    suspend fun handleMissingEntityIdOrAttributeOnDeleteAttribute(): ResponseEntity<*> =
+    fun handleMissingEntityIdOrAttributeOnDeleteAttribute(): ResponseEntity<*> =
         missingPathErrorResponse("Missing entity id or attribute id when trying to delete an attribute temporal")
 
     /**
@@ -334,22 +323,20 @@ class TemporalEntityHandler(
     @DeleteMapping("/{entityId}/attrs/{attrId}/{instanceId}")
     suspend fun deleteAttributeInstanceTemporal(
         @RequestHeader httpHeaders: HttpHeaders,
-        @PathVariable entityId: String,
+        @PathVariable entityId: URI,
         @PathVariable attrId: String,
-        @PathVariable instanceId: String
+        @PathVariable instanceId: URI
     ): ResponseEntity<*> = either {
         val sub = getSubFromSecurityContext()
-        val entityUri = entityId.toUri()
-        val instanceUri = instanceId.toUri()
         val contexts = listOf(getContextFromLinkHeaderOrDefault(httpHeaders).bind())
         attrId.checkNameIsNgsiLdSupported().bind()
         val expandedAttrId = JsonLdUtils.expandJsonLdTerm(attrId, contexts)
 
-        entityPayloadService.checkEntityExistence(entityUri).bind()
+        entityPayloadService.checkEntityExistence(entityId).bind()
 
-        authorizationService.userCanUpdateEntity(entityUri, sub).bind()
+        authorizationService.userCanUpdateEntity(entityId, sub).bind()
 
-        attributeInstanceService.deleteInstance(entityUri, expandedAttrId, instanceUri).bind()
+        attributeInstanceService.deleteInstance(entityId, expandedAttrId, instanceId).bind()
 
         ResponseEntity.status(HttpStatus.NO_CONTENT).build<String>()
     }.fold(
@@ -358,7 +345,7 @@ class TemporalEntityHandler(
     )
 
     @DeleteMapping("/attrs/{attrId}/{instanceId}")
-    suspend fun handleMissingEntityIdOrAttrOnDeleteAttrInstance(): ResponseEntity<*> =
+    fun handleMissingEntityIdOrAttrOnDeleteAttrInstance(): ResponseEntity<*> =
         missingPathErrorResponse(
             "Missing entity, attribute or instance id when trying to delete an attribute instance"
         )

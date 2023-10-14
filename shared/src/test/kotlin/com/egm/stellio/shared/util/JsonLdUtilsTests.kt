@@ -20,7 +20,6 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.springframework.http.MediaType
-import java.time.ZonedDateTime
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class JsonLdUtilsTests {
@@ -57,7 +56,7 @@ class JsonLdUtilsTests {
                 "https://example.org/ngsi-ld/latest/commonTerms.jsonld",
                 "https://example.org/ngsi-ld/latest/vehicle.jsonld",
                 "https://example.org/ngsi-ld/latest/parking.jsonld",
-                "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context-v1.3.jsonld"
+                "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context-v1.7.jsonld"
             ]
         }
         """.trimIndent()
@@ -80,7 +79,7 @@ class JsonLdUtilsTests {
                 "https://example.org/ngsi-ld/latest/commonTerms.jsonld",
                 "https://example.org/ngsi-ld/latest/vehicle.jsonld",
                 "https://example.org/ngsi-ld/latest/parking.jsonld",
-                "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context-v1.3.jsonld"
+                "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context-v1.7.jsonld"
             ]
         }
         """.trimIndent()
@@ -194,7 +193,7 @@ class JsonLdUtilsTests {
             """
             {
                 "@context": [
-                    "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context-v1.3.jsonld"
+                    "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context-v1.7.jsonld"
                 ]
             }
             """.trimIndent()
@@ -340,7 +339,7 @@ class JsonLdUtilsTests {
                 "type":"Device",
                 "@context":[
                     "https://fiware.github.io/data-models/context.jsonld",
-                    "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context-v1.3.jsonld"
+                    "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context-v1.7.jsonld"
                 ]
             }
             """.trimIndent()
@@ -464,7 +463,7 @@ class JsonLdUtilsTests {
             "value" to 12.0
         )
 
-        val attrPayloadWithSysAttrs = attrPayload.addSysAttrs(true, ZonedDateTime.now(), null)
+        val attrPayloadWithSysAttrs = attrPayload.addSysAttrs(true, ngsiLdDateTime(), null)
 
         assertTrue(attrPayloadWithSysAttrs.containsKey(JsonLdUtils.NGSILD_CREATED_AT_PROPERTY))
         assertFalse(attrPayloadWithSysAttrs.containsKey(JsonLdUtils.NGSILD_MODIFIED_AT_PROPERTY))
@@ -477,7 +476,7 @@ class JsonLdUtilsTests {
             "value" to 12.0
         )
 
-        val attrPayloadWithSysAttrs = attrPayload.addSysAttrs(true, ZonedDateTime.now(), ZonedDateTime.now())
+        val attrPayloadWithSysAttrs = attrPayload.addSysAttrs(true, ngsiLdDateTime(), ngsiLdDateTime())
 
         assertTrue(attrPayloadWithSysAttrs.containsKey(JsonLdUtils.NGSILD_CREATED_AT_PROPERTY))
         assertTrue(attrPayloadWithSysAttrs.containsKey(JsonLdUtils.NGSILD_MODIFIED_AT_PROPERTY))

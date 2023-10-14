@@ -1,16 +1,17 @@
 package com.egm.stellio.shared.model
 
 import arrow.core.Either
-import arrow.core.continuations.either
-import arrow.core.continuations.ensureNotNull
 import arrow.core.flatten
 import arrow.core.left
+import arrow.core.raise.either
+import arrow.core.raise.ensure
+import arrow.core.raise.ensureNotNull
 import arrow.core.right
-import arrow.fx.coroutines.parTraverseEither
+import arrow.fx.coroutines.parMap
 import com.egm.stellio.shared.util.*
 import com.egm.stellio.shared.util.JsonLdUtils.JSONLD_ID
 import com.egm.stellio.shared.util.JsonLdUtils.JSONLD_TYPE
-import com.egm.stellio.shared.util.JsonLdUtils.JSONLD_VALUE_KW
+import com.egm.stellio.shared.util.JsonLdUtils.JSONLD_VALUE
 import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_CREATED_AT_PROPERTY
 import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_DATASET_ID_PROPERTY
 import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_GEOPROPERTY_TYPE
@@ -21,6 +22,7 @@ import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_PROPERTY_TYPE
 import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_PROPERTY_VALUE
 import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_RELATIONSHIP_HAS_OBJECT
 import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_RELATIONSHIP_TYPE
+import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_SCOPE_PROPERTY
 import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_UNIT_CODE_PROPERTY
 import com.egm.stellio.shared.util.JsonLdUtils.extractRelationshipObject
 import com.egm.stellio.shared.util.JsonLdUtils.getPropertyValueFromMap
@@ -32,6 +34,7 @@ import java.time.ZonedDateTime
 class NgsiLdEntity private constructor(
     val id: URI,
     val types: List<ExpandedTerm>,
+    val scopes: List<String>?,
     val relationships: List<NgsiLdRelationship>,
     val properties: List<NgsiLdProperty>,
     val geoProperties: List<NgsiLdGeoProperty>,
@@ -52,6 +55,8 @@ class NgsiLdEntity private constructor(
             }
             val types = parsedKeys[JSONLD_TYPE]!! as List<String>
 
+            val scopes = (parsedKeys as Map<String, List<Any>>).getScopes()
+
             val attributes = getNonCoreAttributes(parsedKeys, NGSILD_ENTITY_CORE_MEMBERS)
             val relationships = getAttributesOfType<NgsiLdRelationship>(attributes, NGSILD_RELATIONSHIP_TYPE).bind()
             val properties = getAttributesOfType<NgsiLdProperty>(attributes, NGSILD_PROPERTY_TYPE).bind()
@@ -62,7 +67,7 @@ class NgsiLdEntity private constructor(
                 BadRequestDataException("Entity has attribute(s) with an unknown type: $attributesWithUnknownTypes")
             }
 
-            NgsiLdEntity(id, types, relationships, properties, geoProperties, contexts)
+            NgsiLdEntity(id, types, scopes, relationships, properties, geoProperties, contexts)
         }
     }
 
@@ -84,9 +89,9 @@ class NgsiLdProperty private constructor(
         ): Either<APIException, NgsiLdProperty> = either {
             checkInstancesAreOfSameType(name, instances, NGSILD_PROPERTY_TYPE).bind()
 
-            val ngsiLdPropertyInstances = instances.parTraverseEither { instance ->
-                NgsiLdPropertyInstance.create(name, instance)
-            }.bind()
+            val ngsiLdPropertyInstances = instances.parMap { instance ->
+                NgsiLdPropertyInstance.create(name, instance).bind()
+            }
 
             checkAttributeDefaultInstance(name, ngsiLdPropertyInstances).bind()
             checkAttributeDuplicateDatasetId(name, ngsiLdPropertyInstances).bind()
@@ -109,9 +114,9 @@ class NgsiLdRelationship private constructor(
         ): Either<APIException, NgsiLdRelationship> = either {
             checkInstancesAreOfSameType(name, instances, NGSILD_RELATIONSHIP_TYPE).bind()
 
-            val ngsiLdRelationshipInstances = instances.parTraverseEither { instance ->
-                NgsiLdRelationshipInstance.create(name, instance)
-            }.bind()
+            val ngsiLdRelationshipInstances = instances.parMap { instance ->
+                NgsiLdRelationshipInstance.create(name, instance).bind()
+            }
 
             checkAttributeDefaultInstance(name, ngsiLdRelationshipInstances).bind()
             checkAttributeDuplicateDatasetId(name, ngsiLdRelationshipInstances).bind()
@@ -134,9 +139,9 @@ class NgsiLdGeoProperty private constructor(
         ): Either<APIException, NgsiLdGeoProperty> = either {
             checkInstancesAreOfSameType(name, instances, NGSILD_GEOPROPERTY_TYPE).bind()
 
-            val ngsiLdGeoPropertyInstances = instances.parTraverseEither { instance ->
-                NgsiLdGeoPropertyInstance.create(name, instance)
-            }.bind()
+            val ngsiLdGeoPropertyInstances = instances.parMap { instance ->
+                NgsiLdGeoPropertyInstance.create(name, instance).bind()
+            }
 
             checkAttributeDefaultInstance(name, ngsiLdGeoPropertyInstances).bind()
             checkAttributeDuplicateDatasetId(name, ngsiLdGeoPropertyInstances).bind()
@@ -149,7 +154,7 @@ class NgsiLdGeoProperty private constructor(
 }
 
 sealed class NgsiLdAttributeInstance(
-    val createdAt: ZonedDateTime? = ZonedDateTime.now(),
+    val createdAt: ZonedDateTime? = ngsiLdDateTime(),
     val modifiedAt: ZonedDateTime?,
     val observedAt: ZonedDateTime?,
     val datasetId: URI?,
@@ -267,7 +272,7 @@ class NgsiLdGeoPropertyInstance(
             val observedAt = getPropertyValueFromMapAsDateTime(values, NGSILD_OBSERVED_AT_PROPERTY)
             val datasetId = values.getDatasetId()
 
-            val wktValue = (values[NGSILD_GEOPROPERTY_VALUE]!![0] as Map<String, String>)[JSONLD_VALUE_KW] as String
+            val wktValue = (values[NGSILD_GEOPROPERTY_VALUE]!![0] as Map<String, String>)[JSONLD_VALUE] as String
             val attributes = getNonCoreAttributes(values, NGSILD_GEOPROPERTIES_CORE_MEMBERS)
             val relationships = getAttributesOfType<NgsiLdRelationship>(attributes, NGSILD_RELATIONSHIP_TYPE).bind()
             val properties = getAttributesOfType<NgsiLdProperty>(attributes, NGSILD_PROPERTY_TYPE).bind()
@@ -318,7 +323,7 @@ private suspend inline fun <reified T : NgsiLdAttribute> getAttributesOfType(
                 NGSILD_PROPERTY_TYPE -> NgsiLdProperty.create(it.key, it.value).bind() as T
                 NGSILD_RELATIONSHIP_TYPE -> NgsiLdRelationship.create(it.key, it.value).bind() as T
                 NGSILD_GEOPROPERTY_TYPE -> NgsiLdGeoProperty.create(it.key, it.value).bind() as T
-                else -> BadRequestDataException("Unrecognized type: $type").left().bind()
+                else -> BadRequestDataException("Unrecognized type: $type").left().bind<T>()
             }
         }
 }
@@ -359,10 +364,11 @@ fun checkAttributeDuplicateDatasetId(
     else Unit.right()
 }
 
-suspend fun ExpandedAttributes.toNgsiLdAttributes(): Either<APIException, List<NgsiLdAttribute>> =
-    this.entries.parTraverseEither {
-        it.value.toNgsiLdAttribute(it.key)
+suspend fun ExpandedAttributes.toNgsiLdAttributes(): Either<APIException, List<NgsiLdAttribute>> = either {
+    entries.parMap {
+        it.value.toNgsiLdAttribute(it.key).bind()
     }
+}
 
 suspend fun ExpandedAttribute.toNgsiLdAttribute(): Either<APIException, NgsiLdAttribute> =
     this.second.toNgsiLdAttribute(this.first)
@@ -386,6 +392,16 @@ suspend fun JsonLdEntity.toNgsiLdEntity(): Either<APIException, NgsiLdEntity> =
 fun ExpandedAttributeInstance.getDatasetId(): URI? =
     (this[NGSILD_DATASET_ID_PROPERTY]?.get(0) as? Map<String, String>)?.get(JSONLD_ID)?.toUri()
 
+fun ExpandedAttributeInstance.getScopes(): List<String>? =
+    when (val rawScopes = getPropertyValueFromMap(this, NGSILD_SCOPE_PROPERTY)) {
+        is String -> listOf(rawScopes)
+        is List<*> -> rawScopes as List<String>
+        else -> null
+    }
+
+fun ExpandedAttributeInstance.getPropertyValue(): Any =
+    (this[NGSILD_PROPERTY_VALUE]!![0] as Map<String, Any>)[JSONLD_VALUE]!!
+
 fun List<NgsiLdAttribute>.flatOnInstances(): List<Pair<NgsiLdAttribute, NgsiLdAttributeInstance>> =
     this.flatMap { ngsiLdAttribute ->
         ngsiLdAttribute.getAttributeInstances().map { Pair(ngsiLdAttribute, it) }
@@ -394,6 +410,7 @@ fun List<NgsiLdAttribute>.flatOnInstances(): List<Pair<NgsiLdAttribute, NgsiLdAt
 val NGSILD_ENTITY_CORE_MEMBERS = listOf(
     JSONLD_ID,
     JSONLD_TYPE,
+    NGSILD_SCOPE_PROPERTY,
     NGSILD_CREATED_AT_PROPERTY,
     NGSILD_MODIFIED_AT_PROPERTY
 )

@@ -1,9 +1,9 @@
+
 import com.google.cloud.tools.jib.gradle.PlatformParameters
 import io.gitlab.arturbosch.detekt.Detekt
 import io.gitlab.arturbosch.detekt.DetektCreateBaselineTask
 import io.spring.gradle.dependencymanagement.dsl.DependencyManagementExtension
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
-import org.jlleitschuh.gradle.ktlint.reporter.ReporterType
 
 buildscript {
     dependencies {
@@ -11,8 +11,7 @@ buildscript {
     }
 }
 
-extra["springCloudVersion"] = "2022.0.0"
-extra["testcontainersVersion"] = "1.17.5"
+extra["springCloudVersion"] = "2022.0.2"
 
 plugins {
     // https://docs.spring.io/spring-boot/docs/current/gradle-plugin/reference/htmlsingle/#reacting-to-other-plugins.java
@@ -20,15 +19,14 @@ plugins {
     `kotlin-dsl`
     // only apply the plugin in the subprojects requiring it because it expects a Spring Boot app
     // and the shared lib is obviously not one
-    id("org.springframework.boot") version "3.0.6" apply false
-    id("io.spring.dependency-management") version "1.1.0" apply false
-    id("org.graalvm.buildtools.native") version "0.9.22"
-    kotlin("jvm") version "1.8.21" apply false
-    kotlin("plugin.spring") version "1.8.21" apply false
-    id("org.jlleitschuh.gradle.ktlint") version "11.3.2"
-    id("com.google.cloud.tools.jib") version "3.3.2" apply false
-    id("io.gitlab.arturbosch.detekt") version "1.22.0" apply false
-    id("org.sonarqube") version "4.0.0.2929"
+    id("org.springframework.boot") version "3.1.4" apply false
+    id("io.spring.dependency-management") version "1.1.3" apply false
+    id("org.graalvm.buildtools.native") version "0.9.27"
+    kotlin("jvm") version "1.9.10" apply false
+    kotlin("plugin.spring") version "1.9.10" apply false
+    id("com.google.cloud.tools.jib") version "3.4.0" apply false
+    id("io.gitlab.arturbosch.detekt") version "1.23.1" apply false
+    id("org.sonarqube") version "4.4.1.3373"
     jacoco
 }
 
@@ -41,7 +39,6 @@ subprojects {
     apply(plugin = "io.spring.dependency-management")
     apply(plugin = "org.jetbrains.kotlin.jvm")
     apply(plugin = "org.jetbrains.kotlin.plugin.spring")
-    apply(plugin = "org.jlleitschuh.gradle.ktlint")
     apply(plugin = "io.gitlab.arturbosch.detekt")
     apply(plugin = "jacoco")
 
@@ -49,7 +46,6 @@ subprojects {
 
     the<DependencyManagementExtension>().apply {
         imports {
-            mavenBom("org.testcontainers:testcontainers-bom:${property("testcontainersVersion")}")
             mavenBom("org.springframework.cloud:spring-cloud-dependencies:${property("springCloudVersion")}")
         }
     }
@@ -70,7 +66,7 @@ subprojects {
         implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
         implementation("com.github.jsonld-java:jsonld-java:0.13.4")
 
-        implementation("io.arrow-kt:arrow-fx-coroutines:1.1.5")
+        implementation("io.arrow-kt:arrow-fx-coroutines:1.2.1")
 
         implementation("org.locationtech.jts.io:jts-io-common:1.19.0")
 
@@ -103,11 +99,12 @@ subprojects {
         }
     }
 
-    ktlint {
-        disabledRules.set(setOf("multiline-if-else", "no-wildcard-imports"))
-        reporters {
-            reporter(ReporterType.CHECKSTYLE)
-            reporter(ReporterType.PLAIN)
+    // see https://github.com/detekt/detekt/issues/6198
+    configurations.matching { it.name == "detekt" }.all {
+        resolutionStrategy.eachDependency {
+            if (requested.group == "org.jetbrains.kotlin") {
+                useVersion("1.9.0")
+            }
         }
     }
 

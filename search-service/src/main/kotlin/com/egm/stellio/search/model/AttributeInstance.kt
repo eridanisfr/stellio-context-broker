@@ -1,6 +1,5 @@
 package com.egm.stellio.search.model
 
-import com.egm.stellio.shared.model.Notification
 import com.egm.stellio.shared.model.WKTCoordinates
 import com.egm.stellio.shared.util.ExpandedAttributeInstance
 import com.egm.stellio.shared.util.JsonLdUtils.NGSILD_INSTANCE_ID_PROPERTY
@@ -50,19 +49,6 @@ data class AttributeInstance private constructor(
 
         operator fun invoke(
             temporalEntityAttribute: UUID,
-            notification: Notification,
-            value: String,
-            payload: ExpandedAttributeInstance
-        ): AttributeInstance = AttributeInstance(
-            temporalEntityAttribute = temporalEntityAttribute,
-            instanceId = notification.id,
-            time = notification.notifiedAt,
-            value = value,
-            payload = payload.composePayload(notification.id).toJson()
-        )
-
-        operator fun invoke(
-            temporalEntityAttribute: UUID,
             instanceId: URI = generateRandomInstanceId(),
             timeAndProperty: Pair<ZonedDateTime, TemporalProperty>,
             value: Triple<String?, Double?, WKTCoordinates?>,
@@ -104,7 +90,7 @@ data class AttributeInstance private constructor(
 
         companion object {
             fun forPropertyName(propertyName: String): TemporalProperty? =
-                values().find { it.propertyName == propertyName }
+                entries.find { it.propertyName == propertyName }
         }
     }
 }

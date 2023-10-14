@@ -11,6 +11,9 @@ import org.springframework.http.ResponseEntity
 import org.springframework.util.MultiValueMap
 import java.net.URI
 
+fun invalidUriMessage(identifier: String) =
+    "The supplied identifier was expected to be an URI but it is not: $identifier"
+
 fun entityNotFoundMessage(entityId: String) = "Entity $entityId was not found"
 fun entityAlreadyExistsMessage(entityId: String) = "Entity $entityId already exists"
 
@@ -36,7 +39,10 @@ fun invalidCharacterInName(name: Any?) =
     "The JSON-LD object contains a member with invalid characters (4.6.2): $name"
 
 fun invalidCharacterInContent(content: Any?) =
-    "The JSON-LD object contains a member with invalid characters in value (4.6.3): $content"
+    "The JSON-LD object contains a member with invalid characters in value (4.6.4): $content"
+
+fun invalidCharacterInScope(name: Any?) =
+    "The JSON-LD object contains a scope with invalid characters (4.18): $name"
 
 const val NULL_VALUE_IN_CONTENT = "The JSON-LD object contains a member with a null value (5.5.4)"
 
